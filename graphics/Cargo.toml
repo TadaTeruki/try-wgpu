@@ -1,5 +1,5 @@
 [package]
-name = "chunks-graphics"
+name = "graphics"
 version = "0.1.0"
 edition = "2021"
 

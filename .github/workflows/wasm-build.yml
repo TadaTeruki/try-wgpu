@@ -1,0 +1,39 @@
+name: WASM Build
+
+on:
+  push:
+    branches:
+      - '*'
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+        
+    - name: Install Build Dependencies
+      run: |
+        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    
+    - name: Build
+      run: |
+        git config user.name "$(git --no-pager log --format=format:'%an' -n 1)"
+        git config user.email "$(git --no-pager log --format=format:'%ae' -n 1)"
+        export DEPLOY_BRANCH=`git rev-parse --abbrev-ref HEAD`-deploy
+        git switch -c $DEPLOY_BRANCH
+        git pull origin main
+        git rm ./view/.gitignore
+        cd graphics
+        make build
+        cd ..
+        rm ./view/pkg/.gitignore
+        git add .
+        git commit -m "build: $(date +'%Y/%m/%d')" 
+        git push origin -f $DEPLOY_BRANCH
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

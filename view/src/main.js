@@ -1,4 +1,4 @@
-import init from "../pkg/chunks_graphics.js";
+import init from "../pkg/graphics.js";
 import { utils } from "./lib/utils.js";
 
 window.onload = () => {
