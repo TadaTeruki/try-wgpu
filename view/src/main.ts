@@ -40,6 +40,22 @@ async function main() {
 	};
 	requestAnimationFrame(renderloop);
 
+	// key event
+	addEventListener("keydown", (event) => {
+		state.key_event(event);
+	});
+	addEventListener("keyup", (event) => {
+		state.key_event(event);
+	});
+
+	// purge all cached events when the page is not visible
+	document.addEventListener("visibilitychange", () => {
+		state.leave();
+	});
+	document.addEventListener("blur", () => {
+		state.leave();
+	});
+
 	// `update` is called 60 times per second
 	const updateInterval = 1000 / 60;
 	const initialTime = Date.now();

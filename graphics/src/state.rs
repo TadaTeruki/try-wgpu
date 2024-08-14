@@ -1,6 +1,7 @@
-use log::info;
 use wasm_bindgen::prelude::*;
 use wgpu::{util::DeviceExt, SurfaceTarget};
+
+use crate::key::{KeyState, KeyStateMap};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -61,6 +62,8 @@ pub struct State {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+
+    key_states: KeyStateMap,
 
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
@@ -212,6 +215,7 @@ impl State {
             device,
             queue,
             config,
+            key_states: KeyStateMap::new(),
             render_pipeline,
             vertex_buffer,
             index_buffer,
@@ -220,7 +224,42 @@ impl State {
     }
 
     #[wasm_bindgen]
-    pub async fn update(&mut self, _time: f32) {}
+    pub fn key_event(&mut self, event: &web_sys::KeyboardEvent) {
+        let released = event.type_() == "keyup";
+        let key = event.key();
+        if released {
+            self.key_states.insert(key, KeyState::Release);
+        } else {
+            if self.key_states.get(&key).is_some() {
+                return;
+            }
+            self.key_states.insert(key, KeyState::Press);
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn leave(&mut self) {
+        self.key_states.purge();
+    }
+
+    #[wasm_bindgen]
+    pub async fn update(&mut self, _time: f32) {
+        for (_, state) in self.key_states.iter_mut() {
+            match state {
+                KeyState::Press => {
+                    //info!("Key {} pressed", key);
+                }
+                KeyState::Release => {
+                    //info!("Key {} released", key);
+                }
+                KeyState::Kept => {
+                    //info!("Key {} kept", key);
+                }
+            }
+        }
+
+        self.key_states.update();
+    }
 
     #[wasm_bindgen]
     pub fn resize(&mut self, width: u32, height: u32) {

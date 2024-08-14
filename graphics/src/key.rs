@@ -1,0 +1,48 @@
+use std::collections::HashMap;
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum KeyState {
+    Press,
+    Kept,
+    Release,
+}
+
+pub struct KeyStateMap {
+    key_states: HashMap<String, KeyState>,
+}
+
+impl KeyStateMap {
+    pub fn new() -> Self {
+        Self {
+            key_states: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, key: String, state: KeyState) {
+        self.key_states.insert(key, state);
+    }
+
+    pub fn get(&self, key: &str) -> Option<&KeyState> {
+        self.key_states.get(key)
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&String, &mut KeyState)> {
+        self.key_states.iter_mut()
+    }
+
+    pub fn update(&mut self) {
+        self.key_states.iter_mut().for_each(|(_, state)| {
+            if *state == KeyState::Press {
+                *state = KeyState::Kept;
+            }
+        });
+        self.key_states
+            .retain(|_, state| *state != KeyState::Release);
+    }
+
+    pub fn purge(&mut self) {
+        self.key_states.iter_mut().for_each(|(_, state)| {
+            *state = KeyState::Release;
+        });
+    }
+}
