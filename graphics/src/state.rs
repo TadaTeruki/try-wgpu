@@ -1,3 +1,4 @@
+use log::info;
 use wasm_bindgen::prelude::*;
 use wgpu::{util::DeviceExt, SurfaceTarget};
 
@@ -219,7 +220,7 @@ impl State {
     }
 
     #[wasm_bindgen]
-    pub fn update(&mut self) {}
+    pub async fn update(&mut self, _time: f32) {}
 
     #[wasm_bindgen]
     pub fn resize(&mut self, width: u32, height: u32) {

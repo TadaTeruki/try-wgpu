@@ -33,13 +33,28 @@ async function main() {
 	addEventListener("resize", () => fullscreenCanvas(canvas, state));
 	fullscreenCanvas(canvas, state);
 
-	// mainloop
-	const update = () => {
+	// `render` is called per the refresh rate of the display
+	const renderloop = () => {
 		state.render();
-		requestAnimationFrame(update);
+		requestAnimationFrame(renderloop);
+	};
+	requestAnimationFrame(renderloop);
+
+	// `update` is called 60 times per second
+	const updateInterval = 1000 / 60;
+	const initialTime = Date.now();
+
+	const updateloop = () => {
+		const currentTime = Date.now();
+		state.update((currentTime - initialTime) / updateInterval);
+		const nextTime = Date.now();
+
+		const passedTime = nextTime - currentTime;
+		const remainingTime = Math.max(0, updateInterval - passedTime);
+		setTimeout(updateloop, remainingTime);
 	};
 
-	update();
+	updateloop();
 }
 
 window.onload = main;
