@@ -26,6 +26,10 @@ impl KeyStateMap {
         self.key_states.get(key)
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &KeyState)> {
+        self.key_states.iter()
+    }
+
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (&String, &mut KeyState)> {
         self.key_states.iter_mut()
     }
