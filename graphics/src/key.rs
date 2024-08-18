@@ -7,6 +7,12 @@ pub enum KeyState {
     Release,
 }
 
+impl KeyState {
+    pub fn is_pressing(&self) -> bool {
+        *self == KeyState::Press || *self == KeyState::Kept
+    }
+}
+
 pub struct KeyStateMap {
     key_states: HashMap<String, KeyState>,
 }
@@ -28,10 +34,6 @@ impl KeyStateMap {
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &KeyState)> {
         self.key_states.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&String, &mut KeyState)> {
-        self.key_states.iter_mut()
     }
 
     pub fn update(&mut self) {

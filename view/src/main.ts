@@ -52,6 +52,7 @@ async function main() {
 	document.addEventListener("visibilitychange", () => {
 		state.leave();
 	});
+
 	document.addEventListener("blur", () => {
 		state.leave();
 	});
@@ -66,8 +67,13 @@ async function main() {
 		const nextTime = Date.now();
 
 		const passedTime = nextTime - currentTime;
-		const remainingTime = Math.max(0, updateInterval - passedTime);
-		setTimeout(updateloop, remainingTime);
+		const remainingTime = updateInterval - passedTime;
+		if (remainingTime < 0) {
+			console.log("update");
+			updateloop();
+		} else {
+			setTimeout(updateloop, remainingTime);
+		}
 	};
 
 	updateloop();

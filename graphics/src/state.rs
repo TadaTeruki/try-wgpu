@@ -1,7 +1,10 @@
 use wasm_bindgen::prelude::*;
 use wgpu::{util::DeviceExt, SurfaceTarget};
 
-use crate::{camera::{controller::CameraController, Camera, CameraUniform}, key::{KeyState, KeyStateMap}};
+use crate::{
+    camera::Camera,
+    key::{KeyState, KeyStateMap},
+};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -33,28 +36,24 @@ impl Vertex {
 
 const VERTICES: &[Vertex] = &[
     Vertex {
-        position: [-0.0868241, 0.49240386, 0.0],
+        position: [-1.0, -1.0, 0.0],
         color: [1.0, 0.5, 0.0],
     },
     Vertex {
-        position: [-0.49513406, 0.06958647, 0.0],
+        position: [1.0, -1.0, 0.0],
         color: [1.0, 0.5, 0.5],
     },
     Vertex {
-        position: [-0.21918549, -0.44939706, 0.0],
-        color: [0.5, 0.0, 0.5],
+        position: [-1.0, 1.0, 0.0],
+        color: [0.25, 0.0, 0.75],
     },
     Vertex {
-        position: [0.35966998, -0.3473291, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    Vertex {
-        position: [0.44147372, 0.2347359, 0.0],
-        color: [0.5, 0.0, 0.5],
+        position: [1.0, 1.0, 0.0],
+        color: [0.75, 0.0, 0.25],
     },
 ];
 
-const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
+const INDICES: &[u16] = &[0, 1, 2, 0, 1, 3];
 
 #[wasm_bindgen]
 pub struct State {
@@ -66,10 +65,8 @@ pub struct State {
     key_states: KeyStateMap,
 
     camera: Camera,
-    camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    camera_controller: CameraController,
 
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
@@ -157,22 +154,12 @@ impl State {
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
-        let camera = Camera {
-            eye: (0.0, 1.0, 2.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
-
-        let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
+        let mut camera = Camera::default();
+        camera.set_aspect(config.width as f32 / config.height as f32);
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[camera_uniform]),
+            contents: bytemuck::cast_slice(&[camera.build_uniform()]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -189,7 +176,7 @@ impl State {
                     count: None,
                 }],
                 label: Some("camera_bind_group_layout"),
-            });  
+            });
 
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &camera_bind_group_layout,
@@ -200,15 +187,12 @@ impl State {
             label: Some("camera_bind_group"),
         });
 
-        let camera_controller = CameraController::new(0.1);
-
-
         let render_pipeline_layout =
-        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[],
-            push_constant_ranges: &[],
-        });
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[&camera_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
@@ -261,7 +245,6 @@ impl State {
         });
 
         let num_indices = INDICES.len() as u32;
-      
 
         Ok(Self {
             surface,
@@ -271,10 +254,8 @@ impl State {
             key_states: KeyStateMap::new(),
 
             camera,
-            camera_uniform,
             camera_buffer,
             camera_bind_group,
-            c
 
             render_pipeline,
             vertex_buffer,
@@ -304,20 +285,12 @@ impl State {
 
     #[wasm_bindgen]
     pub async fn update(&mut self, _time: f32) {
-        for (_, state) in self.key_states.iter_mut() {
-            match state {
-                KeyState::Press => {
-                    //info!("Key {} pressed", key);
-                }
-                KeyState::Release => {
-                    //info!("Key {} released", key);
-                }
-                KeyState::Kept => {
-                    //info!("Key {} kept", key);
-                }
-            }
-        }
-
+        self.camera.process_events(&self.key_states);
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera.build_uniform()]),
+        );
         self.key_states.update();
     }
 
@@ -326,6 +299,7 @@ impl State {
         self.config.width = width;
         self.config.height = height;
         self.surface.configure(&self.device, &self.config);
+        self.camera.set_aspect(width as f32 / height as f32);
     }
 
     #[wasm_bindgen]
@@ -361,6 +335,7 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
