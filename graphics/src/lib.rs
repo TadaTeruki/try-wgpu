@@ -7,6 +7,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 mod camera;
 mod key;
+mod model;
 mod state;
 
 #[wasm_bindgen(start)]

@@ -21,7 +21,7 @@ impl Default for Camera {
             fovy: 45.0,
             znear: 0.1,
             zfar: 100.0,
-            speed: 0.1,
+            speed: 50.0,
         }
     }
 }

@@ -1,59 +1,17 @@
 use wasm_bindgen::prelude::*;
-use wgpu::{util::DeviceExt, SurfaceTarget};
+use wgpu::{
+    util::DeviceExt, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+    SamplerBindingType, ShaderStages, SurfaceTarget,
+};
 
 use crate::{
     camera::Camera,
     key::{KeyState, KeyStateMap},
+    model::{
+        model::{DrawModel, Model},
+        vertex::ModelVertex,
+    },
 };
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
-}
-
-impl Vertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-            ],
-        }
-    }
-}
-
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-1.0, -1.0, 0.0],
-        color: [1.0, 0.5, 0.0],
-    },
-    Vertex {
-        position: [1.0, -1.0, 0.0],
-        color: [1.0, 0.5, 0.5],
-    },
-    Vertex {
-        position: [-1.0, 1.0, 0.0],
-        color: [0.25, 0.0, 0.75],
-    },
-    Vertex {
-        position: [1.0, 1.0, 0.0],
-        color: [0.75, 0.0, 0.25],
-    },
-];
-
-const INDICES: &[u16] = &[0, 1, 2, 0, 1, 3];
 
 #[wasm_bindgen]
 pub struct State {
@@ -64,14 +22,13 @@ pub struct State {
 
     key_states: KeyStateMap,
 
+    // todo: put togather them into Camera
     camera: Camera,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
 
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
+    models: Vec<Model>,
 }
 
 #[wasm_bindgen]
@@ -149,11 +106,6 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-        });
-
         let mut camera = Camera::default();
         camera.set_aspect(config.width as f32 / config.height as f32);
 
@@ -187,20 +139,56 @@ impl State {
             label: Some("camera_bind_group"),
         });
 
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("texture_bind_group_layout"),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&camera_bind_group_layout],
+                label: Some("render_pipeline_layout"),
+                bind_group_layouts: &[&camera_bind_group_layout, &texture_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
+        let main_model = Model::create(
+            &device,
+            &queue,
+            include_bytes!("../resources/earth/earth.obj"),
+            include_bytes!("../resources/earth/earth_diff.png"),
+            &texture_bind_group_layout,
+        )?;
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
+            label: Some("render_pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[ModelVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -232,20 +220,6 @@ impl State {
             cache: None,
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        let num_indices = INDICES.len() as u32;
-
         Ok(Self {
             surface,
             device,
@@ -258,9 +232,7 @@ impl State {
             camera_bind_group,
 
             render_pipeline,
-            vertex_buffer,
-            index_buffer,
-            num_indices,
+            models: vec![main_model],
         })
     }
 
@@ -335,10 +307,9 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            for m in &self.models {
+                render_pass.draw_model(m, &self.camera_bind_group)
+            }
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));

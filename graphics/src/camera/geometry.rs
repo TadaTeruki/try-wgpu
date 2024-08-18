@@ -9,7 +9,7 @@ pub struct CameraGeometry {
 impl Default for CameraGeometry {
     fn default() -> Self {
         Self {
-            eye: (0.0, 0.0, 5.0).into(),
+            eye: (0.0, 0.0, 5000.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up_axis: cgmath::Vector3::unit_y(),
         }
