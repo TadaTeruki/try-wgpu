@@ -3,7 +3,7 @@ use cgmath::InnerSpace;
 pub struct CameraGeometry {
     eye: cgmath::Point3<f32>,
     target: cgmath::Point3<f32>,
-    up: cgmath::Vector3<f32>,
+    up_axis: cgmath::Vector3<f32>,
 }
 
 impl Default for CameraGeometry {
@@ -11,17 +11,17 @@ impl Default for CameraGeometry {
         Self {
             eye: (0.0, 0.0, 5.0).into(),
             target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(),
+            up_axis: cgmath::Vector3::unit_y(),
         }
     }
 }
 
 impl CameraGeometry {
     pub fn build_view_matrix(&self) -> cgmath::Matrix4<f32> {
-        cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up)
+        cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up_axis)
     }
 
-    // forward, forward_norm, right, right_norm
+    // forward, forward_norm, right, right_norm, up, up_norm
     fn axis(
         &self,
     ) -> (
@@ -29,65 +29,71 @@ impl CameraGeometry {
         cgmath::Vector3<f32>,
         cgmath::Vector3<f32>,
         cgmath::Vector3<f32>,
+        cgmath::Vector3<f32>,
+        cgmath::Vector3<f32>,
     ) {
         let forward = self.target - self.eye;
         let forward_norm = forward.normalize();
-        let right = forward_norm.cross(cgmath::Vector3::unit_y());
+        let right = forward_norm.cross(self.up_axis);
         let right_norm = right.normalize();
-        (forward, forward_norm, right, right_norm)
+        let up = right_norm.cross(forward_norm);
+        let up_norm = up.normalize();
+        (forward, forward_norm, right, right_norm, up, up_norm)
     }
 
     pub fn move_forward(&mut self, speed: f32) {
-        let (_, forward_norm, _, _) = self.axis();
+        let (_, forward_norm, _, _, _, _) = self.axis();
         self.eye += forward_norm * speed;
         self.target += forward_norm * speed;
     }
 
     pub fn move_backward(&mut self, speed: f32) {
-        let (_, forward_norm, _, _) = self.axis();
+        let (_, forward_norm, _, _, _, _) = self.axis();
         self.eye -= forward_norm * speed;
         self.target -= forward_norm * speed;
     }
 
     pub fn move_up(&mut self, speed: f32) {
-        self.eye += cgmath::Vector3::unit_y() * speed;
-        self.target += cgmath::Vector3::unit_y() * speed;
+        let (_, _, _, _, _, up_norm) = self.axis();
+        self.eye += up_norm * speed;
+        self.target += up_norm * speed;
     }
 
     pub fn move_down(&mut self, speed: f32) {
-        self.eye -= cgmath::Vector3::unit_y() * speed;
-        self.target -= cgmath::Vector3::unit_y() * speed;
+        let (_, _, _, _, _, up_norm) = self.axis();
+        self.eye -= up_norm * speed;
+        self.target -= up_norm * speed;
     }
 
     pub fn move_right(&mut self, speed: f32) {
-        let (_, _, _, right_norm) = self.axis();
+        let (_, _, _, right_norm, _, _) = self.axis();
         self.eye += right_norm * speed;
         self.target += right_norm * speed;
     }
 
     pub fn move_left(&mut self, speed: f32) {
-        let (_, _, _, right_norm) = self.axis();
+        let (_, _, _, right_norm, _, _) = self.axis();
         self.eye -= right_norm * speed;
         self.target -= right_norm * speed;
     }
 
     pub fn rotate_right(&mut self, speed: f32) {
-        let (forward, _, right, _) = self.axis();
+        let (forward, _, right, _, _, _) = self.axis();
         self.target = self.eye + (forward + right * speed).normalize() * forward.magnitude();
     }
 
     pub fn rotate_left(&mut self, speed: f32) {
-        let (forward, _, right, _) = self.axis();
+        let (forward, _, right, _, _, _) = self.axis();
         self.target = self.eye + (forward - right * speed).normalize() * forward.magnitude();
     }
 
     pub fn rotate_up(&mut self, speed: f32) {
-        let (forward, _, _, _) = self.axis();
-        self.target = self.eye + (forward + self.up * speed).normalize() * forward.magnitude();
+        let (forward, _, _, _, up, _) = self.axis();
+        self.target = self.eye + (forward + up * speed).normalize() * forward.magnitude();
     }
 
     pub fn rotate_down(&mut self, speed: f32) {
-        let (forward, _, _, _) = self.axis();
-        self.target = self.eye + (forward - self.up * speed).normalize() * forward.magnitude();
+        let (forward, _, _, _, up, _) = self.axis();
+        self.target = self.eye + (forward - up * speed).normalize() * forward.magnitude();
     }
 }
