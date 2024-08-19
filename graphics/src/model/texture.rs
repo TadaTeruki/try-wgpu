@@ -3,6 +3,7 @@
 use image::GenericImageView;
 
 pub struct TextureSet {
+    #[allow(dead_code)]
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     sampler: wgpu::Sampler,

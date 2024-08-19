@@ -1,4 +1,3 @@
-use log::info;
 use wasm_bindgen::prelude::*;
 use wgpu::{
     BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, SamplerBindingType, ShaderStages,
