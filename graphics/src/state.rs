@@ -1,11 +1,11 @@
 use wasm_bindgen::prelude::*;
 use wgpu::{
-    util::DeviceExt, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    SamplerBindingType, ShaderStages, SurfaceTarget,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, SamplerBindingType, ShaderStages,
+    SurfaceTarget,
 };
 
 use crate::{
-    camera::Camera,
+    camera::{perspective::CameraPerspective, Camera},
     key::{KeyState, KeyStateMap},
     model::{
         model::{DrawModel, Model},
@@ -22,10 +22,7 @@ pub struct State {
 
     key_states: KeyStateMap,
 
-    // todo: put togather them into Camera
     camera: Camera,
-    camera_buffer: wgpu::Buffer,
-    camera_bind_group: wgpu::BindGroup,
 
     render_pipeline: wgpu::RenderPipeline,
     models: Vec<Model>,
@@ -106,39 +103,9 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
-        let mut camera = Camera::default();
-        camera.set_aspect(config.width as f32 / config.height as f32);
-
-        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[camera.build_uniform()]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let camera_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("camera_bind_group_layout"),
-            });
-
-        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &camera_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: camera_buffer.as_entire_binding(),
-            }],
-            label: Some("camera_bind_group"),
-        });
-
+        let mut perspective = CameraPerspective::default();
+        perspective.set_aspect(config.width as f32 / config.height as f32);
+        let camera = Camera::new(&device, perspective);
         let texture_bind_group_layout =
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some("texture_bind_group_layout"),
@@ -174,7 +141,7 @@ impl State {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render_pipeline_layout"),
-                bind_group_layouts: &[&camera_bind_group_layout, &texture_bind_group_layout],
+                bind_group_layouts: &[&camera.bind_group_layout, &texture_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -229,8 +196,6 @@ impl State {
             key_states: KeyStateMap::new(),
 
             camera,
-            camera_buffer,
-            camera_bind_group,
 
             render_pipeline,
             models: vec![main_model],
@@ -258,11 +223,11 @@ impl State {
 
     #[wasm_bindgen]
     pub async fn update(&mut self, _time: f32) {
-        self.camera.process_events(&self.key_states);
+        self.camera.perspective.process_events(&self.key_states);
         self.queue.write_buffer(
-            &self.camera_buffer,
+            &self.camera.buffer,
             0,
-            bytemuck::cast_slice(&[self.camera.build_uniform()]),
+            bytemuck::cast_slice(&[self.camera.perspective.build_uniform()]),
         );
         self.key_states.update();
     }
@@ -272,7 +237,9 @@ impl State {
         self.config.width = width;
         self.config.height = height;
         self.surface.configure(&self.device, &self.config);
-        self.camera.set_aspect(width as f32 / height as f32);
+        self.camera
+            .perspective
+            .set_aspect(width as f32 / height as f32);
     }
 
     #[wasm_bindgen]
@@ -309,7 +276,7 @@ impl State {
 
             render_pass.set_pipeline(&self.render_pipeline);
             for m in &self.models {
-                render_pass.draw_model(m, &self.camera_bind_group)
+                render_pass.draw_model(m, &self.camera.bind_group)
             }
         }
 

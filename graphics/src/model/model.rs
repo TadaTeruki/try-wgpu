@@ -1,6 +1,6 @@
 // code from: https://github.com/sotrh/learn-wgpu
 
-use std::{collections::HashMap, io::BufReader};
+use std::io::BufReader;
 
 use wgpu::{util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindingResource};
 
@@ -12,13 +12,13 @@ pub struct Model {
 }
 
 pub struct Material {
-    pub name: String,
-    pub diffuse_texture: texture::TextureSet,
+    name: String,
+    diffuse_texture: texture::TextureSet,
     pub bind_group: wgpu::BindGroup,
 }
 
 pub struct Mesh {
-    pub name: String,
+    name: String,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_elements: u32,

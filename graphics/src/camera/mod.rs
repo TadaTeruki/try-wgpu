@@ -1,29 +1,14 @@
-use geometry::CameraGeometry;
-
-use crate::key::KeyStateMap;
+use perspective::CameraPerspective;
+use wgpu::util::DeviceExt;
 
 mod geometry;
-mod keymap;
-pub struct Camera {
-    geom: CameraGeometry,
-    aspect: f32,
-    fovy: f32,
-    znear: f32,
-    zfar: f32,
-    speed: f32,
-}
+pub mod perspective;
 
-impl Default for Camera {
-    fn default() -> Self {
-        Self {
-            geom: CameraGeometry::default(),
-            aspect: 1.0,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-            speed: 50.0,
-        }
-    }
+pub struct Camera {
+    pub buffer: wgpu::Buffer,
+    pub bind_group: wgpu::BindGroup,
+    pub bind_group_layout: wgpu::BindGroupLayout,
+    pub perspective: CameraPerspective,
 }
 
 #[repr(C)]
@@ -33,43 +18,41 @@ pub struct CameraUniform {
 }
 
 impl Camera {
-    pub fn set_aspect(&mut self, aspect: f32) {
-        self.aspect = aspect;
-    }
+    pub fn new(device: &wgpu::Device, perspective: CameraPerspective) -> Self {
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("camera_buffer"),
+            contents: bytemuck::cast_slice(&[perspective.build_uniform()]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
-    pub fn process_events(&mut self, key_states: &KeyStateMap) {
-        key_states
-            .iter()
-            .filter(|(_, state)| state.is_pressing())
-            .for_each(|(key, _)| match key.as_str() {
-                keymap::KEY_MOVE_FORWARD => self.geom.move_forward(self.speed),
-                keymap::KEY_MOVE_BACKWARD => self.geom.move_backward(self.speed),
-                keymap::KEY_MOVE_UP => self.geom.move_up(self.speed),
-                keymap::KEY_MOVE_DOWN => self.geom.move_down(self.speed),
-                keymap::KEY_MOVE_RIGHT => self.geom.move_right(self.speed),
-                keymap::KEY_MOVE_LEFT => self.geom.move_left(self.speed),
-                keymap::KEY_ROTATE_RIGHT => self.geom.rotate_right(self.speed),
-                keymap::KEY_ROTATE_LEFT => self.geom.rotate_left(self.speed),
-                keymap::KEY_ROTATE_UP => self.geom.rotate_up(self.speed),
-                keymap::KEY_ROTATE_DOWN => self.geom.rotate_down(self.speed),
-                _ => {}
-            });
-    }
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: Some("bind_group_layout"),
+        });
 
-    pub fn build_uniform(&self) -> CameraUniform {
-        let view = self.geom.build_view_matrix();
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
-        CameraUniform {
-            view_proj: view_proj.into(),
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+            label: Some("bind_group"),
+        });
+
+        Self {
+            bind_group,
+            buffer,
+            perspective,
+            bind_group_layout,
         }
     }
 }
-
-#[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.5, 0.5,
-    0.0, 0.0, 0.0, 1.0,
-);
