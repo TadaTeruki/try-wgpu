@@ -147,7 +147,7 @@ impl State {
                         binding: 0,
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
@@ -162,20 +162,21 @@ impl State {
                 ],
             });
 
+        let main_model = Model::create(
+            &device,
+            &queue,
+            include_bytes!("../resources/earth/earth.obj"),
+            include_bytes!("../resources/earth/earth.mtl"),
+            include_bytes!("../resources/earth/earth_diff.png"),
+            &texture_bind_group_layout,
+        )?;
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render_pipeline_layout"),
                 bind_group_layouts: &[&camera_bind_group_layout, &texture_bind_group_layout],
                 push_constant_ranges: &[],
             });
-
-        let main_model = Model::create(
-            &device,
-            &queue,
-            include_bytes!("../resources/earth/earth.obj"),
-            include_bytes!("../resources/earth/earth_diff.png"),
-            &texture_bind_group_layout,
-        )?;
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("shader"),

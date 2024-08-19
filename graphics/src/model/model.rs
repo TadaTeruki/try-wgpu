@@ -28,11 +28,16 @@ impl Model {
     pub fn create(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        // todo: change this to a remote file
         obj_src: &[u8],
+        mtl_src: &[u8], // this will be removed
         texture_diffuse_src: &[u8],
         texture_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> anyhow::Result<Self> {
         let mut bufreader = BufReader::new(obj_src);
+
+        // this is a temporary solution to load the mtl file
+        let raw_mtl = tobj::load_mtl_buf(&mut BufReader::new(mtl_src))?;
 
         let (raw_models, _) = tobj::load_obj_buf(
             &mut bufreader,
@@ -41,7 +46,7 @@ impl Model {
                 triangulate: true,
                 ..Default::default()
             },
-            |_| tobj::MTLLoadResult::Ok((vec![], HashMap::new())),
+            |_| tobj::MTLLoadResult::Ok(raw_mtl.clone()),
         )?;
 
         let raw_model = &raw_models.get(0).expect("No model loaded");
