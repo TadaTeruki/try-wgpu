@@ -32,6 +32,7 @@ jobs:
         make build
         cd ..
         rm ./view/pkg/.gitignore
+        rm ./view/public/resources/.gitignore
         git add .
         git commit -m "build: $(date +'%Y/%m/%d %H:%M:%S')" 
         git push origin -f $DEPLOY_BRANCH

@@ -16,11 +16,10 @@ wasm-bindgen = "0.2.92"
 wasm-bindgen-futures = "0.4.30"
 wgpu = "22.1.0"
 web-sys = { version = "0.3", features = [
-    "Document",
-    "Window",
     "HtmlCanvasElement",
-    "Element",
     "KeyboardEvent",
+    "Window",
+    "Location",
 ]}
 wasm-logger = "0.2.0"
 wee_alloc = "0.4.5"
@@ -29,3 +28,5 @@ cgmath = "0.18.0"
 image = "0.25.2"
 anyhow = "1.0.86"
 getrandom = { version = "0.2", features = ["js"] }
+reqwest = "0.12.5"
+futures = "0.3.30"

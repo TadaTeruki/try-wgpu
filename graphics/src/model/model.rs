@@ -2,9 +2,8 @@
 
 use std::io::BufReader;
 
-use wgpu::{util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindingResource};
-
 use super::{texture, vertex::ModelVertex};
+use wgpu::{util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindingResource};
 
 pub struct Model {
     pub mesh: Mesh,
@@ -25,18 +24,16 @@ pub struct Mesh {
 }
 
 impl Model {
-    pub fn create(
+    pub async fn create(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        // todo: change this to a remote file
         obj_src: &[u8],
-        mtl_src: &[u8], // this will be removed
+        mtl_src: &[u8],
         texture_diffuse_src: &[u8],
         texture_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> anyhow::Result<Self> {
         let mut bufreader = BufReader::new(obj_src);
 
-        // this is a temporary solution to load the mtl file
         let raw_mtl = tobj::load_mtl_buf(&mut BufReader::new(mtl_src))?;
 
         let (raw_models, _) = tobj::load_obj_buf(

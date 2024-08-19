@@ -1,3 +1,4 @@
+use log::info;
 use wasm_bindgen::prelude::*;
 use wgpu::{
     BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, SamplerBindingType, ShaderStages,
@@ -6,6 +7,7 @@ use wgpu::{
 
 use crate::{
     camera::{perspective::CameraPerspective, Camera},
+    fetch::Fetcher,
     key::{KeyState, KeyStateMap},
     model::{
         model::{DrawModel, Model},
@@ -19,11 +21,8 @@ pub struct State {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-
     key_states: KeyStateMap,
-
     camera: Camera,
-
     render_pipeline: wgpu::RenderPipeline,
     models: Vec<Model>,
 }
@@ -129,14 +128,36 @@ impl State {
                 ],
             });
 
+        let href = web_sys::window().unwrap().location().href().unwrap();
+        let fetcher = Fetcher::new(&href);
+
+        let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
+            fetcher.fetch_as_bytes("resources/earth/earth.obj"),
+            fetcher.fetch_as_bytes("resources/earth/earth.mtl"),
+            fetcher.fetch_as_bytes("resources/earth/earth_diff.png"),
+        );
+
+        let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
+            earth_obj?.bytes(),
+            earth_mtl?.bytes(),
+            earth_texture_diffuse?.bytes(),
+        );
+
+        let (earth_obj, earth_mtl, earth_texture_diffuse) = (
+            &earth_obj? as &[u8],
+            &earth_mtl? as &[u8],
+            &earth_texture_diffuse? as &[u8],
+        );
+
         let main_model = Model::create(
             &device,
             &queue,
-            include_bytes!("../resources/earth/earth.obj"),
-            include_bytes!("../resources/earth/earth.mtl"),
-            include_bytes!("../resources/earth/earth_diff.png"),
+            earth_obj,
+            earth_mtl,
+            earth_texture_diffuse,
             &texture_bind_group_layout,
-        )?;
+        )
+        .await?;
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
