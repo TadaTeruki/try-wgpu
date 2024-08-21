@@ -8,6 +8,7 @@ use crate::{
     camera::{perspective::CameraPerspective, Camera},
     fetch::Fetcher,
     key::{KeyState, KeyStateMap},
+    light::Light,
     model::{
         model::{DrawModel, Model},
         vertex::ModelVertex,
@@ -22,6 +23,7 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     key_states: KeyStateMap,
     camera: Camera,
+    light: Light,
     render_pipeline: wgpu::RenderPipeline,
     models: Vec<Model>,
 }
@@ -128,6 +130,20 @@ impl State {
                 ],
             });
 
+        let light_position = cgmath::Point3 {
+            x: 0.0,
+            y: 5000.0,
+            z: 5000.0,
+        };
+
+        let light_color = cgmath::Point3 {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        };
+
+        let light = Light::new(&device, light_position, light_color);
+
         let href = web_sys::window().unwrap().location().href().unwrap();
         let fetcher = Fetcher::new(&href);
 
@@ -149,7 +165,7 @@ impl State {
             &earth_texture_diffuse? as &[u8],
         );
 
-        let main_model = Model::create(
+        let earth_model = Model::create(
             &device,
             &queue,
             earth_obj,
@@ -159,17 +175,21 @@ impl State {
         )
         .await?;
 
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("render_pipeline_layout"),
-                bind_group_layouts: &[&camera.bind_group_layout, &texture_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("render_pipeline_layout"),
+                bind_group_layouts: &[
+                    &camera.bind_group_layout,
+                    &texture_bind_group_layout,
+                    &light.bind_group_layout,
+                ],
+                push_constant_ranges: &[],
+            });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("render_pipeline"),
@@ -215,11 +235,10 @@ impl State {
             queue,
             config,
             key_states: KeyStateMap::new(),
-
             camera,
-
+            light,
             render_pipeline,
-            models: vec![main_model],
+            models: vec![earth_model],
         })
     }
 
@@ -297,7 +316,7 @@ impl State {
 
             render_pass.set_pipeline(&self.render_pipeline);
             for m in &self.models {
-                render_pass.draw_model(m, &self.camera.bind_group)
+                render_pass.draw_model(m, &self.camera.bind_group, &self.light.bind_group)
             }
         }
 

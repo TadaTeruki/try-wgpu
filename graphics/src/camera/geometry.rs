@@ -21,6 +21,10 @@ impl CameraGeometry {
         cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up_axis)
     }
 
+    pub fn build_pos_vec(&self) -> cgmath::Vector3<f32> {
+        cgmath::Vector3::new(self.eye.x, self.eye.y, self.eye.z)
+    }
+
     // forward, forward_norm, right, right_norm, up, up_norm
     fn axis(
         &self,

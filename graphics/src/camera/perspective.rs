@@ -54,6 +54,8 @@ impl CameraPerspective {
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
         CameraUniform {
+            view_pos: self.geom.build_pos_vec().into(),
+            _padding: 0,
             view_proj: view_proj.into(),
         }
     }

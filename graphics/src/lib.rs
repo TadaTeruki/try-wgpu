@@ -8,6 +8,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 mod camera;
 mod fetch;
 mod key;
+mod light;
 mod model;
 mod state;
 

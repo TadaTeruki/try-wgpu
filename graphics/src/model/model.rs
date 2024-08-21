@@ -124,9 +124,15 @@ pub trait DrawModel<'a> {
         mesh: &'a Mesh,
         material: &'a Material,
         camera_bind_group: &'a wgpu::BindGroup,
+        light_bind_group: &'a wgpu::BindGroup,
     );
 
-    fn draw_model(&mut self, model: &'a Model, camera_bind_group: &'a wgpu::BindGroup);
+    fn draw_model(
+        &mut self,
+        model: &'a Model,
+        camera_bind_group: &'a wgpu::BindGroup,
+        light_bind_group: &'a wgpu::BindGroup,
+    );
 }
 
 impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
@@ -135,15 +141,27 @@ impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
         mesh: &'a Mesh,
         material: &'a Material,
         camera_bind_group: &'a wgpu::BindGroup,
+        light_bind_group: &'a wgpu::BindGroup,
     ) {
         self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
         self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         self.set_bind_group(0, camera_bind_group, &[]);
         self.set_bind_group(1, &material.bind_group, &[]);
+        self.set_bind_group(2, &light_bind_group, &[]);
         self.draw_indexed(0..mesh.num_elements, 0, 0..1);
     }
 
-    fn draw_model(&mut self, model: &'a Model, camera_bind_group: &'a wgpu::BindGroup) {
-        self.draw_mesh(&model.mesh, &model.material, camera_bind_group)
+    fn draw_model(
+        &mut self,
+        model: &'a Model,
+        camera_bind_group: &'a wgpu::BindGroup,
+        light_bind_group: &'a wgpu::BindGroup,
+    ) {
+        self.draw_mesh(
+            &model.mesh,
+            &model.material,
+            camera_bind_group,
+            light_bind_group,
+        )
     }
 }
