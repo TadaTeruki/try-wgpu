@@ -5,10 +5,10 @@ use wgpu::{
 };
 
 use crate::{
-    camera::{perspective::CameraPerspective, Camera},
+    camera::{geometry::CameraGeometry, perspective::CameraPerspective, Camera},
     fetch::Fetcher,
     key::{KeyState, KeyStateMap},
-    light::Light,
+    light::{property::LightProperty, Light},
     model::{
         model::{DrawModel, Model},
         vertex::ModelVertex,
@@ -104,9 +104,25 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
-        let mut perspective = CameraPerspective::default();
-        perspective.set_aspect(config.width as f32 / config.height as f32);
+        let perspective = CameraPerspective::new(
+            CameraGeometry::new(
+                (0.0, 0.0, -5000.0).into(),
+                (0.0, 0.0, 0.0).into(),
+                cgmath::Vector3::unit_y(),
+            ),
+            50.0,
+            config.width as f32 / config.height as f32,
+            45.0,
+            0.1,
+            100.0,
+        );
         let camera = Camera::new(&device, perspective);
+
+        let light_property =
+            LightProperty::new((0.0, 250000.0, 250000.0).into(), (1.0, 1.0, 1.0).into());
+
+        let light = Light::new(&device, light_property);
+
         let texture_bind_group_layout =
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some("texture_bind_group_layout"),
@@ -129,20 +145,6 @@ impl State {
                     },
                 ],
             });
-
-        let light_position = cgmath::Point3 {
-            x: 0.0,
-            y: 5000.0,
-            z: 5000.0,
-        };
-
-        let light_color = cgmath::Point3 {
-            x: 1.0,
-            y: 1.0,
-            z: 1.0,
-        };
-
-        let light = Light::new(&device, light_position, light_color);
 
         let href = web_sys::window().unwrap().location().href().unwrap();
         let fetcher = Fetcher::new(&href);
@@ -279,7 +281,7 @@ impl State {
         self.surface.configure(&self.device, &self.config);
         self.camera
             .perspective
-            .set_aspect(width as f32 / height as f32);
+            .update_aspect(width as f32 / height as f32);
     }
 
     #[wasm_bindgen]

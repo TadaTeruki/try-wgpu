@@ -31,21 +31,26 @@ pub struct CameraPerspective {
     zfar: f32,
 }
 
-impl Default for CameraPerspective {
-    fn default() -> Self {
+impl CameraPerspective {
+    pub fn new(
+        geom: CameraGeometry,
+        speed: f32,
+        aspect: f32,
+        fovy: f32,
+        znear: f32,
+        zfar: f32,
+    ) -> Self {
         Self {
-            geom: CameraGeometry::default(),
-            speed: 50.0,
-            aspect: 1.0,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
+            geom,
+            speed,
+            aspect,
+            fovy,
+            znear,
+            zfar,
         }
     }
-}
 
-impl CameraPerspective {
-    pub fn set_aspect(&mut self, aspect: f32) {
+    pub fn update_aspect(&mut self, aspect: f32) {
         self.aspect = aspect;
     }
 

@@ -6,23 +6,26 @@ pub struct CameraGeometry {
     up_axis: cgmath::Vector3<f32>,
 }
 
-impl Default for CameraGeometry {
-    fn default() -> Self {
+impl CameraGeometry {
+    pub fn new(
+        eye: cgmath::Point3<f32>,
+        target: cgmath::Point3<f32>,
+        up_axis: cgmath::Vector3<f32>,
+    ) -> Self {
         Self {
-            eye: (0.0, 0.0, 5000.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
-            up_axis: cgmath::Vector3::unit_y(),
+            eye,
+            target,
+            up_axis,
         }
     }
-}
 
-impl CameraGeometry {
     pub fn build_view_matrix(&self) -> cgmath::Matrix4<f32> {
         cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up_axis)
     }
 
     pub fn build_pos_vec(&self) -> cgmath::Vector3<f32> {
-        cgmath::Vector3::new(self.eye.x, self.eye.y, self.eye.z)
+        let eye_homogeneous = self.eye.to_homogeneous();
+        cgmath::Vector3::new(eye_homogeneous.x, eye_homogeneous.y, eye_homogeneous.z)
     }
 
     // forward, forward_norm, right, right_norm, up, up_norm
