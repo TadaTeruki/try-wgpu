@@ -24,8 +24,8 @@ pub struct State {
     key_states: KeyStateMap,
     camera: Camera,
     light: Light,
-    render_pipeline: wgpu::RenderPipeline,
-    models: Vec<Model>,
+    earth_render_pipeline: wgpu::RenderPipeline,
+    earth_model: Model,
 }
 
 #[wasm_bindgen]
@@ -149,87 +149,91 @@ impl State {
         let href = web_sys::window().unwrap().location().href().unwrap();
         let fetcher = Fetcher::new(&href);
 
-        let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
-            fetcher.fetch_as_bytes("resources/earth/earth.obj"),
-            fetcher.fetch_as_bytes("resources/earth/earth.mtl"),
-            fetcher.fetch_as_bytes("resources/earth/earth_diff.png"),
-        );
+        let (earth_model, earth_render_pipeline) = {
+            let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
+                fetcher.fetch_as_bytes("resources/earth/earth.obj"),
+                fetcher.fetch_as_bytes("resources/earth/earth.mtl"),
+                fetcher.fetch_as_bytes("resources/earth/earth_diff.png"),
+            );
 
-        let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
-            earth_obj?.bytes(),
-            earth_mtl?.bytes(),
-            earth_texture_diffuse?.bytes(),
-        );
+            let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
+                earth_obj?.bytes(),
+                earth_mtl?.bytes(),
+                earth_texture_diffuse?.bytes(),
+            );
 
-        let (earth_obj, earth_mtl, earth_texture_diffuse) = (
-            &earth_obj? as &[u8],
-            &earth_mtl? as &[u8],
-            &earth_texture_diffuse? as &[u8],
-        );
+            let (earth_obj, earth_mtl, earth_texture_diffuse) = (
+                &earth_obj? as &[u8],
+                &earth_mtl? as &[u8],
+                &earth_texture_diffuse? as &[u8],
+            );
 
-        let earth_model = Model::create(
-            &device,
-            &queue,
-            earth_obj,
-            earth_mtl,
-            earth_texture_diffuse,
-            &texture_bind_group_layout,
-        )
-        .await?;
+            let model = Model::create(
+                &device,
+                &queue,
+                earth_obj,
+                earth_mtl,
+                earth_texture_diffuse,
+                &texture_bind_group_layout,
+            )
+            .await?;
 
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-        });
-
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("render_pipeline_layout"),
-                bind_group_layouts: &[
-                    &camera.bind_group_layout,
-                    &texture_bind_group_layout,
-                    &light.bind_group_layout,
-                ],
-                push_constant_ranges: &[],
+            let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("shader/earth.wgsl").into()),
             });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("render_pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[ModelVertex::desc()],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        });
+            let render_pipeline_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("render_pipeline_layout"),
+                    bind_group_layouts: &[
+                        &camera.bind_group_layout,
+                        &texture_bind_group_layout,
+                        &light.bind_group_layout,
+                    ],
+                    push_constant_ranges: &[],
+                });
+
+            let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("render_pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: "vs_main",
+                    buffers: &[ModelVertex::desc()],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+                cache: None,
+            });
+
+            (model, render_pipeline)
+        };
 
         Ok(Self {
             surface,
@@ -239,8 +243,8 @@ impl State {
             key_states: KeyStateMap::new(),
             camera,
             light,
-            render_pipeline,
-            models: vec![earth_model],
+            earth_render_pipeline,
+            earth_model,
         })
     }
 
@@ -316,10 +320,12 @@ impl State {
                 timestamp_writes: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
-            for m in &self.models {
-                render_pass.draw_model(m, &self.camera.bind_group, &self.light.bind_group)
-            }
+            render_pass.set_pipeline(&self.earth_render_pipeline);
+            render_pass.draw_model(
+                &self.earth_model,
+                &self.camera.bind_group,
+                &self.light.bind_group,
+            )
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
