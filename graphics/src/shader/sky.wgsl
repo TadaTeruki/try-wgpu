@@ -1,6 +1,8 @@
 struct CameraUniform {
     view_pos: vec4<f32>,
+    target_pos: vec4<f32>,
     view_proj: mat4x4<f32>,
+    aspect: f32,
 }
 
 @group(0) @binding(0)

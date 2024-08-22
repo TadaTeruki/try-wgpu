@@ -30,3 +30,4 @@ anyhow = "1.0.86"
 getrandom = { version = "0.2", features = ["js"] }
 reqwest = "0.12.5"
 futures = "0.3.30"
+rand = "0.8.5"

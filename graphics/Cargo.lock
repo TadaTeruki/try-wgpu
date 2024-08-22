@@ -782,6 +782,7 @@ dependencies = [
  "getrandom",
  "image",
  "log",
+ "rand",
  "reqwest",
  "tobj",
  "wasm-bindgen",

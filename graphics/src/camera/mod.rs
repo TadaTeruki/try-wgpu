@@ -15,7 +15,10 @@ pub struct Camera {
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
     view_pos: [f32; 4],
+    target_pos: [f32; 4],
     view_proj: [[f32; 4]; 4],
+    aspect: f32,
+    _padding: [f32; 7],
 }
 
 impl Camera {

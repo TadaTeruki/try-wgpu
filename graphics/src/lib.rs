@@ -10,6 +10,7 @@ mod fetch;
 mod key;
 mod light;
 mod model;
+mod star;
 mod state;
 
 #[wasm_bindgen(start)]

@@ -1,7 +1,8 @@
+use cgmath::InnerSpace;
 use wasm_bindgen::prelude::*;
 use wgpu::{
-    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, RenderPipelineDescriptor,
-    SamplerBindingType, ShaderStages, SurfaceTarget,
+    util::DeviceExt, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+    RenderPipelineDescriptor, SamplerBindingType, ShaderStages, SurfaceTarget,
 };
 
 use crate::{
@@ -13,6 +14,7 @@ use crate::{
         model::{DrawModel, Model},
         vertex::ModelVertex,
     },
+    star::{Star, StarInstanceRaw},
 };
 
 #[wasm_bindgen]
@@ -27,6 +29,8 @@ pub struct State {
     earth_render_pipeline: wgpu::RenderPipeline,
     earth_model: Model,
     sky_render_pipeline: wgpu::RenderPipeline,
+    star_render_pipeline: wgpu::RenderPipeline,
+    star: Star,
 }
 
 #[wasm_bindgen]
@@ -213,6 +217,58 @@ impl State {
             render_pipeline
         };
 
+        let (star, star_render_pipeline) = {
+            let shader = device.create_shader_module(wgpu::include_wgsl!("./shader/star.wgsl"));
+            let render_pipeline_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("star_render_pipeline_layout"),
+                    bind_group_layouts: &[&camera.bind_group_layout],
+                    push_constant_ranges: &[],
+                });
+
+            let star = Star::new(&device, &queue);
+
+            let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("star_render_pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: "vs_main",
+                    buffers: &[StarInstanceRaw::desc()],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(blend_state),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+                cache: None,
+            });
+
+            (star, render_pipeline)
+        };
+
         let (earth_model, earth_render_pipeline) = {
             let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
                 fetcher.fetch_as_bytes("resources/earth/earth.obj"),
@@ -307,6 +363,8 @@ impl State {
             earth_render_pipeline,
             earth_model,
             sky_render_pipeline,
+            star_render_pipeline,
+            star,
         })
     }
 
@@ -381,6 +439,17 @@ impl State {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            render_pass.set_pipeline(&self.star_render_pipeline);
+            render_pass.set_vertex_buffer(0, self.star.instance_buffer.slice(..));
+            render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
+            render_pass
+                .set_index_buffer(self.star.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(
+                0..self.star.num_indices,
+                0,
+                0..self.star.instances.len() as u32,
+            );
 
             render_pass.set_pipeline(&self.earth_render_pipeline);
             render_pass.draw_model(

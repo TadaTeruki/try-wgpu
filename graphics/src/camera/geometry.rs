@@ -27,6 +27,10 @@ impl CameraGeometry {
         self.eye.to_homogeneous()
     }
 
+    pub fn build_target_vec(&self) -> cgmath::Vector4<f32> {
+        self.target.to_homogeneous()
+    }
+
     // forward, forward_norm, right, right_norm, up, up_norm
     fn axis(
         &self,

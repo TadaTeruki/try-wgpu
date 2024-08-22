@@ -60,7 +60,10 @@ impl CameraPerspective {
         let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
         CameraUniform {
             view_pos: self.geom.build_pos_vec().into(),
+            target_pos: self.geom.build_target_vec().into(),
             view_proj: view_proj.into(),
+            aspect: self.aspect,
+            _padding: [0.0; 7],
         }
     }
 
