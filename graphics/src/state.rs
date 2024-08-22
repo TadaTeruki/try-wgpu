@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use wgpu::{
-    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, SamplerBindingType, ShaderStages,
-    SurfaceTarget,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, RenderPipelineDescriptor,
+    SamplerBindingType, ShaderStages, SurfaceTarget,
 };
 
 use crate::{
@@ -26,6 +26,7 @@ pub struct State {
     light: Light,
     earth_render_pipeline: wgpu::RenderPipeline,
     earth_model: Model,
+    sky_render_pipeline: wgpu::RenderPipeline,
 }
 
 #[wasm_bindgen]
@@ -149,6 +150,69 @@ impl State {
         let href = web_sys::window().unwrap().location().href().unwrap();
         let fetcher = Fetcher::new(&href);
 
+        let blend_state = wgpu::BlendState {
+            color: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::Zero,
+                dst_factor: wgpu::BlendFactor::One,
+                operation: wgpu::BlendOperation::Add,
+            },
+        };
+
+        let sky_render_pipeline = {
+            let shader = device.create_shader_module(wgpu::include_wgsl!("shader/sky.wgsl"));
+            let render_pipeline_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("sky_render_pipeline_layout"),
+                    bind_group_layouts: &[&camera.bind_group_layout],
+                    push_constant_ranges: &[],
+                });
+
+            let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("sky_render_pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: "vs_main",
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(blend_state),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+                cache: None,
+            });
+
+            render_pipeline
+        };
+
         let (earth_model, earth_render_pipeline) = {
             let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
                 fetcher.fetch_as_bytes("resources/earth/earth.obj"),
@@ -178,14 +242,11 @@ impl State {
             )
             .await?;
 
-            let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("shader/earth.wgsl").into()),
-            });
+            let shader = device.create_shader_module(wgpu::include_wgsl!("shader/earth.wgsl"));
 
             let render_pipeline_layout =
                 device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("render_pipeline_layout"),
+                    label: Some("earth_render_pipeline_layout"),
                     bind_group_layouts: &[
                         &camera.bind_group_layout,
                         &texture_bind_group_layout,
@@ -195,7 +256,7 @@ impl State {
                 });
 
             let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("render_pipeline"),
+                label: Some("earth_render_pipeline"),
                 layout: Some(&render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
@@ -245,6 +306,7 @@ impl State {
             light,
             earth_render_pipeline,
             earth_model,
+            sky_render_pipeline,
         })
     }
 
@@ -307,9 +369,9 @@ impl State {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.3,
-                            b: 0.5,
+                            r: 0.269 / 255.0,
+                            g: 0.388 / 255.0,
+                            b: 0.342 / 255.0,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -325,7 +387,11 @@ impl State {
                 &self.earth_model,
                 &self.camera.bind_group,
                 &self.light.bind_group,
-            )
+            );
+
+            render_pass.set_pipeline(&self.sky_render_pipeline);
+            render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
+            render_pass.draw(0..3, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));

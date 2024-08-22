@@ -50,18 +50,18 @@ fn vs_main(
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let object_color: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
     
-    let ambient_strength = 0.05;
+    let ambient_strength = 0.0;
     let ambient_color = light.color * ambient_strength;
 
     let light_dir = normalize(light.position - in.clip_position.xyz);
 
-    let diffuse_strength = max(dot(in.normal, light_dir), 0.0);
+    let diffuse_strength = min(max(dot(in.normal, light_dir), 0.0), 1.0);
     let diffuse_color = light.color * diffuse_strength;
 
     let view_dir = normalize(camera.view_pos - in.clip_position.xyz);
     let half_dir = normalize(view_dir + light_dir);
 
-    let specular_strength = pow(max(dot(in.normal, half_dir), 0.0), 32.0);
+    let specular_strength = pow(max(dot(in.normal, half_dir), 0.0), 16.0);
     let specular_color = light.color * specular_strength;
    
     let result = (ambient_strength + diffuse_color + specular_color) * object_color.xyz;
