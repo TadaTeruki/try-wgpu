@@ -14,14 +14,14 @@ var t_diffuse: texture_2d<f32>;
 @group(1) @binding(1)
 var s_diffuse: sampler;
 
-struct LightUniform {
+struct SunUniform {
     position: vec4<f32>,
     color: vec3<f32>,
     _padding: u32,
 }
 
 @group(2) @binding(0)
-var<uniform> light: LightUniform;
+var<uniform> light: SunUniform;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,

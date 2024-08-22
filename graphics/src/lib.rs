@@ -6,12 +6,12 @@ use wasm_bindgen::prelude::*;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 mod camera;
+mod earth;
 mod fetch;
 mod key;
-mod light;
-mod model;
 mod star;
 mod state;
+mod sun;
 
 #[wasm_bindgen(start)]
 fn start() {

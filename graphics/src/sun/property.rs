@@ -1,45 +1,45 @@
-pub struct LightProperty {
+pub struct SunProperty {
     position: cgmath::Point3<f32>,
     color: cgmath::Point3<f32>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
-pub struct LightUniform {
+pub struct SunUniform {
     position: [f32; 3],
     _padding0: u32,
     color: [f32; 3],
     _padding1: u32,
 }
 
-pub type LightVertex = LightUniform;
+pub type SunVertex = SunUniform;
 
-impl LightProperty {
+impl SunProperty {
     pub fn new(position: cgmath::Point3<f32>, color: cgmath::Point3<f32>) -> Self {
         Self { position, color }
     }
 
-    pub fn build_uniform(&self) -> LightUniform {
-        return LightUniform {
+    pub fn build_uniform(&self) -> SunUniform {
+        return SunUniform {
             position: self.position.into(),
             color: self.color.into(),
-            ..LightUniform::default()
+            ..SunUniform::default()
         };
     }
 
-    pub fn build_vertex(&self) -> LightVertex {
-        return LightVertex {
+    pub fn build_vertex(&self) -> SunVertex {
+        return SunVertex {
             position: self.position.into(),
             color: self.color.into(),
-            ..LightVertex::default()
+            ..SunVertex::default()
         };
     }
 }
 
-impl LightVertex {
+impl SunVertex {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<LightVertex>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<SunVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &[
                 wgpu::VertexAttribute {

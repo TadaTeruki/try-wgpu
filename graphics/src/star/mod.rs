@@ -1,5 +1,5 @@
 use cgmath::InnerSpace;
-use wgpu::{util::DeviceExt, RenderPipelineDescriptor};
+use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]

@@ -5,12 +5,12 @@ use std::io::BufReader;
 use super::{texture, vertex::ModelVertex};
 use wgpu::{util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindingResource};
 
-pub struct Model {
-    pub mesh: Mesh,
-    pub material: Material,
+pub struct EarthModel {
+    pub mesh: EarthMesh,
+    pub material: EarthMaterial,
 }
 
-pub struct Material {
+pub struct EarthMaterial {
     #[allow(dead_code)]
     name: String,
     #[allow(dead_code)]
@@ -18,7 +18,7 @@ pub struct Material {
     pub bind_group: wgpu::BindGroup,
 }
 
-pub struct Mesh {
+pub struct EarthMesh {
     #[allow(dead_code)]
     name: String,
     pub vertex_buffer: wgpu::Buffer,
@@ -26,7 +26,7 @@ pub struct Mesh {
     pub num_elements: u32,
 }
 
-impl Model {
+impl EarthModel {
     pub async fn create(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -83,7 +83,7 @@ impl Model {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let mesh = Mesh {
+        let mesh = EarthMesh {
             name: "mesh".to_string(),
             vertex_buffer,
             index_buffer,
@@ -108,7 +108,7 @@ impl Model {
             ],
         });
 
-        let material = Material {
+        let material = EarthMaterial {
             name: "Material".to_string(),
             diffuse_texture: texture,
             bind_group: texture_bind_group,
@@ -121,47 +121,47 @@ impl Model {
 pub trait DrawModel<'a> {
     fn draw_mesh(
         &mut self,
-        mesh: &'a Mesh,
-        material: &'a Material,
+        mesh: &'a EarthMesh,
+        material: &'a EarthMaterial,
         camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
+        sun_bind_group: &'a wgpu::BindGroup,
     );
 
     fn draw_model(
         &mut self,
-        model: &'a Model,
+        model: &'a EarthModel,
         camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
+        sun_bind_group: &'a wgpu::BindGroup,
     );
 }
 
 impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
     fn draw_mesh(
         &mut self,
-        mesh: &'a Mesh,
-        material: &'a Material,
+        mesh: &'a EarthMesh,
+        material: &'a EarthMaterial,
         camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
+        sun_bind_group: &'a wgpu::BindGroup,
     ) {
         self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
         self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         self.set_bind_group(0, camera_bind_group, &[]);
         self.set_bind_group(1, &material.bind_group, &[]);
-        self.set_bind_group(2, &light_bind_group, &[]);
+        self.set_bind_group(2, &sun_bind_group, &[]);
         self.draw_indexed(0..mesh.num_elements, 0, 0..1);
     }
 
     fn draw_model(
         &mut self,
-        model: &'a Model,
+        model: &'a EarthModel,
         camera_bind_group: &'a wgpu::BindGroup,
-        light_bind_group: &'a wgpu::BindGroup,
+        sun_bind_group: &'a wgpu::BindGroup,
     ) {
         self.draw_mesh(
             &model.mesh,
             &model.material,
             camera_bind_group,
-            light_bind_group,
+            sun_bind_group,
         )
     }
 }

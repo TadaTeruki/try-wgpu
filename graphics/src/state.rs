@@ -1,24 +1,23 @@
 use cgmath::InnerSpace;
 use wasm_bindgen::prelude::*;
 use wgpu::{
-    util::DeviceExt, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    RenderPipelineDescriptor, SamplerBindingType, ShaderStages, SurfaceTarget,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, RenderPipelineDescriptor,
+    SamplerBindingType, ShaderStages, SurfaceTarget,
 };
 
 use crate::{
     camera::{geometry::CameraGeometry, perspective::CameraPerspective, Camera},
-    fetch::Fetcher,
-    key::{KeyState, KeyStateMap},
-    light::{
-        self,
-        property::{LightProperty, LightVertex},
-        Light,
-    },
-    model::{
-        model::{DrawModel, Model},
+    earth::{
+        model::{DrawModel, EarthModel},
         vertex::ModelVertex,
     },
+    fetch::Fetcher,
+    key::{KeyState, KeyStateMap},
     star::{Star, StarInstanceRaw},
+    sun::{
+        property::{SunProperty, SunVertex},
+        Sun,
+    },
 };
 
 #[wasm_bindgen]
@@ -29,13 +28,12 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     key_states: KeyStateMap,
     camera: Camera,
-    light: Light,
+    sun: Sun,
     earth_render_pipeline: wgpu::RenderPipeline,
-    earth_model: Model,
-    sky_render_pipeline: wgpu::RenderPipeline,
+    earth_model: EarthModel,
     star_render_pipeline: wgpu::RenderPipeline,
     star: Star,
-    light_render_pipeline: wgpu::RenderPipeline,
+    sun_render_pipeline: wgpu::RenderPipeline,
 }
 
 #[wasm_bindgen]
@@ -130,20 +128,20 @@ impl State {
         );
         let camera = Camera::new(&device, perspective);
 
-        let distance_between_light_and_earth = 11728.0 * earth_radius * 2.0;
+        let distance_between_sun_and_earth = 11728.0 * earth_radius * 2.0;
         let earth_axis = cgmath::Vector3::new(0.0, 0.398, 0.917).normalize();
 
-        let light_property = LightProperty::new(
+        let sun_property = SunProperty::new(
             (
                 0.0,
-                distance_between_light_and_earth * earth_axis.y,
-                distance_between_light_and_earth * earth_axis.z,
+                distance_between_sun_and_earth * earth_axis.y,
+                distance_between_sun_and_earth * earth_axis.z,
             )
                 .into(),
             (1.0, 1.0, 1.0).into(),
         );
 
-        let light = Light::new(&device, light_property);
+        let sun = Sun::new(&device, sun_property);
 
         let texture_bind_group_layout =
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -182,56 +180,6 @@ impl State {
                 dst_factor: wgpu::BlendFactor::One,
                 operation: wgpu::BlendOperation::Add,
             },
-        };
-
-        let sky_render_pipeline = {
-            let shader = device.create_shader_module(wgpu::include_wgsl!("shader/sky.wgsl"));
-            let render_pipeline_layout =
-                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("sky_render_pipeline_layout"),
-                    bind_group_layouts: &[&camera.bind_group_layout],
-                    push_constant_ranges: &[],
-                });
-
-            let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-                label: Some("sky_render_pipeline"),
-                layout: Some(&render_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: "vs_main",
-                    buffers: &[],
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: "fs_main",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: config.format,
-                        blend: Some(blend_state),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: Some(wgpu::Face::Back),
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    unclipped_depth: false,
-                    conservative: false,
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState {
-                    count: 1,
-                    mask: !0,
-                    alpha_to_coverage_enabled: false,
-                },
-                multiview: None,
-                cache: None,
-            });
-
-            render_pipeline
         };
 
         let (star, star_render_pipeline) = {
@@ -305,7 +253,7 @@ impl State {
                 &earth_texture_diffuse? as &[u8],
             );
 
-            let model = Model::create(
+            let model = EarthModel::create(
                 &device,
                 &queue,
                 earth_obj,
@@ -323,7 +271,7 @@ impl State {
                     bind_group_layouts: &[
                         &camera.bind_group_layout,
                         &texture_bind_group_layout,
-                        &light.uniform_bind_group_layout,
+                        &sun.uniform_bind_group_layout,
                     ],
                     push_constant_ranges: &[],
                 });
@@ -369,22 +317,22 @@ impl State {
             (model, render_pipeline)
         };
 
-        let light_render_pipeline = {
-            let shader = device.create_shader_module(wgpu::include_wgsl!("shader/light.wgsl"));
+        let sun_render_pipeline = {
+            let shader = device.create_shader_module(wgpu::include_wgsl!("shader/sun.wgsl"));
             let render_pipeline_layout =
                 device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("light_render_pipeline_layout"),
+                    label: Some("sun_render_pipeline_layout"),
                     bind_group_layouts: &[&camera.bind_group_layout],
                     push_constant_ranges: &[],
                 });
 
             device.create_render_pipeline(&RenderPipelineDescriptor {
-                label: Some("light_render_pipeline"),
+                label: Some("sun_render_pipeline"),
                 layout: Some(&render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: "vs_main",
-                    buffers: &[LightVertex::desc()],
+                    buffers: &[SunVertex::desc()],
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
@@ -424,13 +372,12 @@ impl State {
             config,
             key_states: KeyStateMap::new(),
             camera,
-            light,
+            sun,
             earth_render_pipeline,
             earth_model,
-            sky_render_pipeline,
             star_render_pipeline,
             star,
-            light_render_pipeline,
+            sun_render_pipeline,
         })
     }
 
@@ -517,8 +464,8 @@ impl State {
                 0..self.star.instances.len() as u32,
             );
 
-            render_pass.set_pipeline(&self.light_render_pipeline);
-            render_pass.set_vertex_buffer(0, self.light.vertex_buffer.slice(..));
+            render_pass.set_pipeline(&self.sun_render_pipeline);
+            render_pass.set_vertex_buffer(0, self.sun.vertex_buffer.slice(..));
             render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
             render_pass.draw(0..3, 0..1);
 
@@ -526,12 +473,8 @@ impl State {
             render_pass.draw_model(
                 &self.earth_model,
                 &self.camera.bind_group,
-                &self.light.uniform_bind_group,
+                &self.sun.uniform_bind_group,
             );
-
-            render_pass.set_pipeline(&self.sky_render_pipeline);
-            render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
-            render_pass.draw(0..3, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
