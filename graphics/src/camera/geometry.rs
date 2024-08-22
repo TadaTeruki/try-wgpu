@@ -23,9 +23,8 @@ impl CameraGeometry {
         cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up_axis)
     }
 
-    pub fn build_pos_vec(&self) -> cgmath::Vector3<f32> {
-        let eye_homogeneous = self.eye.to_homogeneous();
-        cgmath::Vector3::new(eye_homogeneous.x, eye_homogeneous.y, eye_homogeneous.z)
+    pub fn build_pos_vec(&self) -> cgmath::Vector4<f32> {
+        self.eye.to_homogeneous()
     }
 
     // forward, forward_norm, right, right_norm, up, up_norm

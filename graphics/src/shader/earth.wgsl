@@ -1,7 +1,6 @@
 
 struct CameraUniform {
-    view_pos: vec3<f32>,
-    _padding: u32,
+    view_pos: vec4<f32>,
     view_proj: mat4x4<f32>,
 }
 
@@ -14,8 +13,7 @@ var t_diffuse: texture_2d<f32>;
 var s_diffuse: sampler;
 
 struct LightUniform {
-    position: vec3<f32>,
-    _padding: u32,
+    position: vec4<f32>,
     color: vec3<f32>,
     _padding: u32,
 }
@@ -33,6 +31,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
     @location(1) normal: vec3<f32>,
+    @location(2) model_position: vec3<f32>,
 };
 
 @vertex
@@ -40,9 +39,10 @@ fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.tex_coords = model.tex_coords;
     out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
+    out.tex_coords = model.tex_coords;
     out.normal = model.normal;
+    out.model_position = model.position;
     return out;
 }
 
@@ -53,15 +53,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ambient_strength = 0.0;
     let ambient_color = light.color * ambient_strength;
 
-    let light_dir = normalize(light.position - in.clip_position.xyz);
+    let light_dir = normalize(light.position.xyz - in.model_position);
 
-    let diffuse_strength = min(max(dot(in.normal, light_dir), 0.0), 1.0);
+    let diffuse_strength = min(max(dot(light_dir, in.normal), 0.0), 1.0);
     let diffuse_color = light.color * diffuse_strength;
 
-    let view_dir = normalize(camera.view_pos - in.clip_position.xyz);
-    let half_dir = normalize(view_dir + light_dir);
+    let view_dir = normalize(camera.view_pos.xyz - in.model_position);
+    let reflect_dir = reflect(-light_dir, in.normal);
 
-    let specular_strength = pow(max(dot(in.normal, half_dir), 0.0), 16.0);
+    let specular_strength = pow(max(dot(reflect_dir, view_dir), 0.0), 18.0);
     let specular_color = light.color * specular_strength;
    
     let result = (ambient_strength + diffuse_color + specular_color) * object_color.xyz;
