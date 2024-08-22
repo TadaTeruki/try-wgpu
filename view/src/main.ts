@@ -48,11 +48,10 @@ async function main() {
 		state.key_event(event);
 	});
 
-	// purge all cached events when the page is not visible
+	// reset all events when the page is not visible
 	document.addEventListener("visibilitychange", () => {
 		state.leave();
 	});
-
 	document.addEventListener("blur", () => {
 		state.leave();
 	});
