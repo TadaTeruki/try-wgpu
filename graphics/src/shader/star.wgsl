@@ -29,7 +29,7 @@ fn vs_main(
     if in_vertex_index == 1 { triangle = vec3<f32>(-1.0, -camera.aspect, 0.0);}
     if in_vertex_index == 2 { triangle = vec3<f32>( 1.0, -camera.aspect, 0.0);}
 
-    let scale = 0.0075;
+    let scale = 0.01;
     out.clip_position = vec4<f32>(triangle * scale, 1.0) + camera.view_proj * vec4<f32>(inst.direction*inst.distance, 0.0);
     out.triangle = triangle;
     return out;

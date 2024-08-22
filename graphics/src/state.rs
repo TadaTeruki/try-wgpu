@@ -403,6 +403,7 @@ impl State {
     #[wasm_bindgen]
     pub async fn update(&mut self, _time: f32) {
         self.camera.perspective.process_events(&self.key_states);
+        self.camera.perspective.tween(0.15);
         self.queue.write_buffer(
             &self.camera.buffer,
             0,

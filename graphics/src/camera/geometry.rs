@@ -1,5 +1,6 @@
 use cgmath::InnerSpace;
 
+#[derive(Debug, Clone, Copy)]
 pub struct CameraGeometry {
     eye: cgmath::Point3<f32>,
     target: cgmath::Point3<f32>,
@@ -17,6 +18,24 @@ impl CameraGeometry {
             target,
             up_axis,
         }
+    }
+
+    pub fn tween(&mut self, goal: &CameraGeometry, prop: f32) {
+        self.eye = cgmath::Point3::new(
+            self.eye.x + (goal.eye.x - self.eye.x) * prop,
+            self.eye.y + (goal.eye.y - self.eye.y) * prop,
+            self.eye.z + (goal.eye.z - self.eye.z) * prop,
+        );
+        self.target = cgmath::Point3::new(
+            self.target.x + (goal.target.x - self.target.x) * prop,
+            self.target.y + (goal.target.y - self.target.y) * prop,
+            self.target.z + (goal.target.z - self.target.z) * prop,
+        );
+        self.up_axis = cgmath::Vector3::new(
+            self.up_axis.x + (goal.up_axis.x - self.up_axis.x) * prop,
+            self.up_axis.y + (goal.up_axis.y - self.up_axis.y) * prop,
+            self.up_axis.z + (goal.up_axis.z - self.up_axis.z) * prop,
+        );
     }
 
     pub fn build_view_matrix(&self) -> cgmath::Matrix4<f32> {

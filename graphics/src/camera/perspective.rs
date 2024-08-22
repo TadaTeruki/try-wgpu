@@ -23,7 +23,8 @@ const KEY_ROTATE_RIGHT: &str = "l";
 const KEY_ROTATE_LEFT: &str = "j";
 
 pub struct CameraPerspective {
-    geom: CameraGeometry,
+    geom_current: CameraGeometry,
+    geom_goal: CameraGeometry,
     speed: f32,
     aspect: f32,
     fovy: f32,
@@ -41,7 +42,8 @@ impl CameraPerspective {
         zfar: f32,
     ) -> Self {
         Self {
-            geom,
+            geom_current: geom,
+            geom_goal: geom,
             speed,
             aspect,
             fovy,
@@ -55,12 +57,12 @@ impl CameraPerspective {
     }
 
     pub fn build_uniform(&self) -> CameraUniform {
-        let view = self.geom.build_view_matrix();
+        let view = self.geom_current.build_view_matrix();
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
         CameraUniform {
-            view_pos: self.geom.build_pos_vec().into(),
-            target_pos: self.geom.build_target_vec().into(),
+            view_pos: self.geom_current.build_pos_vec().into(),
+            target_pos: self.geom_current.build_target_vec().into(),
             view_proj: view_proj.into(),
             aspect: self.aspect,
             _padding: [0.0; 7],
@@ -72,17 +74,21 @@ impl CameraPerspective {
             .iter()
             .filter(|(_, state)| state.is_pressing())
             .for_each(|(key, _)| match key.as_str() {
-                KEY_MOVE_FORWARD => self.geom.move_forward(self.speed),
-                KEY_MOVE_BACKWARD => self.geom.move_backward(self.speed),
-                KEY_MOVE_UP => self.geom.move_up(self.speed),
-                KEY_MOVE_DOWN => self.geom.move_down(self.speed),
-                KEY_MOVE_RIGHT => self.geom.move_right(self.speed),
-                KEY_MOVE_LEFT => self.geom.move_left(self.speed),
-                KEY_ROTATE_RIGHT => self.geom.rotate_right(self.speed),
-                KEY_ROTATE_LEFT => self.geom.rotate_left(self.speed),
-                KEY_ROTATE_UP => self.geom.rotate_up(self.speed),
-                KEY_ROTATE_DOWN => self.geom.rotate_down(self.speed),
+                KEY_MOVE_FORWARD => self.geom_goal.move_forward(self.speed),
+                KEY_MOVE_BACKWARD => self.geom_goal.move_backward(self.speed),
+                KEY_MOVE_UP => self.geom_goal.move_up(self.speed),
+                KEY_MOVE_DOWN => self.geom_goal.move_down(self.speed),
+                KEY_MOVE_RIGHT => self.geom_goal.move_right(self.speed),
+                KEY_MOVE_LEFT => self.geom_goal.move_left(self.speed),
+                KEY_ROTATE_RIGHT => self.geom_goal.rotate_right(self.speed),
+                KEY_ROTATE_LEFT => self.geom_goal.rotate_left(self.speed),
+                KEY_ROTATE_UP => self.geom_goal.rotate_up(self.speed),
+                KEY_ROTATE_DOWN => self.geom_goal.rotate_down(self.speed),
                 _ => {}
             });
+    }
+
+    pub fn tween(&mut self, prop: f32) {
+        self.geom_current.tween(&self.geom_goal, prop);
     }
 }
