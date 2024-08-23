@@ -41,7 +41,7 @@ struct VertexOutput {
 
 fn intersection_sphere(ray_origin: vec3<f32>, ray_direction: vec3<f32>, sphere_center: vec3<f32>, sphere_radius: f32) -> mat2x3<f32> {
     let oc = ray_origin - sphere_center;
-    let a = dot(ray_direction, ray_direction);
+    let a = dot(ray_direction, ray_direction)+0.000001;
     let b = 2.0 * dot(oc, ray_direction);
     let c = dot(oc, oc) - sphere_radius * sphere_radius;
     let discriminant = b * b - 4.0 * a * c;
@@ -63,25 +63,77 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     let position = model.position*earth.atmosphere_radius/earth.radius;
-    out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
+    out.clip_position = camera.view_proj * vec4<f32>(position, 1.0);
     out.tex_coords = model.tex_coords;
     out.normal = model.normal;
-    out.model_position = model.position;
+    out.model_position = position;
     return out;
+}
+
+fn vector3_equals(a: vec3<f32>, b: vec3<f32>) -> bool {
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+const DENSITY_FALLOFF: f32 = 3.0;
+
+fn atmosphere_density(position: vec3<f32>, center: vec3<f32>) -> f32 {
+    let distance = length(position - center);
+    let t = min(max((distance-earth.radius)/(earth.atmosphere_radius-earth.radius), 0.0), 1.0);
+    return exp(-t*DENSITY_FALLOFF)*(1-t);
+}
+
+fn optical_depth(ray_start: vec3<f32>, ray_end: vec3<f32>, center: vec3<f32>) -> f32 {
+    let division = 5;
+    let sample_interval = (ray_end - ray_start) / f32(division-1);
+    var optical_depth_sum = 0.0;
+    for (var i: i32 = 0; i < division; i++) {
+        let sample_position = ray_start + sample_interval * f32(i);
+        let local_density = atmosphere_density(sample_position, center);
+        optical_depth_sum = optical_depth_sum + local_density;
+    }
+    return optical_depth_sum/f32(division);
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 0.4);
     let ray_origin = camera.view_pos.xyz;
     let ray_direction = normalize(in.model_position - ray_origin);
-    let intersection_earth = intersection_sphere(ray_origin, ray_direction, vec3<f32>(0.0, 0.0, 0.0), earth.radius);
-    let distance = length(intersection_earth[0] - intersection_earth[1]);
+    let center = vec3<f32>(0.0, 0.0, 0.0);
+    let intersection_ray_earth = intersection_sphere(ray_origin, ray_direction, center, earth.radius);
+    let intersection_ray_atmosphere = intersection_sphere(ray_origin, ray_direction, center, earth.atmosphere_radius);
+    var atmosphere_start: vec3<f32> = intersection_ray_atmosphere[0];
+    var atmosphere_end: vec3<f32> = intersection_ray_earth[0];
+    if (vector3_equals(atmosphere_end, center)) {
+        atmosphere_end = intersection_ray_atmosphere[1];
+    }
+    
+    var strength_average: f32 = 0.0;
+    if (!vector3_equals(atmosphere_start, center) && !vector3_equals(atmosphere_end, center)) {
+        let division: i32 = 20;
+        var strength_sum: f32 = 0.0;
+        let sample_interval = (atmosphere_end - atmosphere_start) / f32(division-1);
+        for (var i: i32 = 0; i < division; i++) {
+            let sample_position = atmosphere_start + sample_interval * f32(i);
+            
+            let sample_sun_dir = normalize(sample_position-sun.position.xyz);
+            
+            let intersection_sun_atmosphere = intersection_sphere(sun.position.xyz, sample_sun_dir, center, earth.atmosphere_radius);
+            
+            // this is not correct
+            let sun_dir = normalize(sun.position.xyz - sample_position);
+            var diffuse_strength = min(max(-dot(-sun_dir, in.normal), 0.0), 1.0);
+            
+            let sun_ray_optical_depth = optical_depth(intersection_sun_atmosphere[0], sample_position, center);
+            let transmittance = exp(-sun_ray_optical_depth);
 
-    let intersection_color = vec3<f32>(1.0, 1.0, 1.0) * distance/earth.radius/4.0;
+            let local_density = atmosphere_density(sample_position, center);
+            strength_sum = strength_sum + transmittance * local_density * diffuse_strength;
+        }
 
+        strength_average = strength_sum/f32(division);
+    }
 
-    let result = (intersection_color) * object_color.xyz;
+    let object_color: vec4<f32> = vec4<f32>(sun.color, strength_average*0.3);
 
-    return vec4<f32>(result, object_color.a);
+    return object_color;
 }

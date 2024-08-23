@@ -57,9 +57,10 @@ pub struct EarthProperty {
 
 impl Default for EarthProperty {
     fn default() -> Self {
+        let radius = 500.0;
         EarthProperty {
-            radius: 500.0,
-            atmosphere_radius: 600.0,
+            radius,
+            atmosphere_radius: radius * 1.025,
         }
     }
 }
