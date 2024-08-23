@@ -1,25 +1,22 @@
-use property::SunProperty;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingType, BufferUsages, ShaderStages,
 };
 
-pub mod property;
-pub struct Sun {
+pub struct EarthPropertyBinding {
     pub uniform_bind_group_layout: wgpu::BindGroupLayout,
     pub uniform_bind_group: wgpu::BindGroup,
-    pub vertex_buffer: wgpu::Buffer,
 }
 
-impl Sun {
-    pub fn new(device: &wgpu::Device, property: SunProperty) -> Self {
+impl EarthPropertyBinding {
+    pub fn new(device: &wgpu::Device, property: EarthProperty) -> Self {
         let uniform_bind_group_layout =
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("sun_bind_group_layout"),
+                label: Some("earth_property_bind_group_layout"),
                 entries: &[BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
+                    visibility: ShaderStages::VERTEX_FRAGMENT,
                     ty: BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -30,13 +27,13 @@ impl Sun {
             });
 
         let uniform_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("sun"),
-            contents: bytemuck::cast_slice(&[property.build_uniform()]),
+            label: Some("earth_property"),
+            contents: bytemuck::cast_slice(&[property]),
             usage: BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
         let uniform_bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("sun_bind_group"),
+            label: Some("earth_property_bind_group"),
             layout: &uniform_bind_group_layout,
             entries: &[BindGroupEntry {
                 binding: 0,
@@ -44,16 +41,31 @@ impl Sun {
             }],
         });
 
-        let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("sun_vertex_buffer"),
-            contents: bytemuck::cast_slice(&[property.build_vertex()]),
-            usage: BufferUsages::VERTEX,
-        });
-
         Self {
             uniform_bind_group,
             uniform_bind_group_layout,
-            vertex_buffer,
         }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct EarthProperty {
+    pub radius: f32,
+    pub atmosphere_radius: f32,
+}
+
+impl Default for EarthProperty {
+    fn default() -> Self {
+        EarthProperty {
+            radius: 500.0,
+            atmosphere_radius: 600.0,
+        }
+    }
+}
+
+impl EarthProperty {
+    pub fn get_distance_between_earth_and_sun(&self) -> f32 {
+        11728.0 * self.radius * 2.0
     }
 }

@@ -8,7 +8,8 @@ use wgpu::{
 use crate::{
     camera::{geometry::CameraGeometry, perspective::CameraPerspective, Camera},
     earth::{
-        model::{DrawModel, EarthModel},
+        model::{create_earth_and_atmosphere_model, AtmosphereModel, DrawModel, EarthModel},
+        property::{EarthProperty, EarthPropertyBinding},
         vertex::ModelVertex,
     },
     fetch::Fetcher,
@@ -31,6 +32,9 @@ pub struct State {
     sun: Sun,
     earth_render_pipeline: wgpu::RenderPipeline,
     earth_model: EarthModel,
+    earth_property_binding: EarthPropertyBinding,
+    atmosphere_render_pipeline: wgpu::RenderPipeline,
+    atmosphere_model: AtmosphereModel,
     star_render_pipeline: wgpu::RenderPipeline,
     star: Star,
     sun_render_pipeline: wgpu::RenderPipeline,
@@ -112,11 +116,12 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
-        let earth_radius = 500.0;
+        let earth_property = EarthProperty::default();
+        let earth_property_binding = EarthPropertyBinding::new(&device, earth_property);
 
         let perspective = CameraPerspective::new(
             CameraGeometry::new(
-                (earth_radius * 4.0, 0.0, 0.0).into(),
+                (earth_property.radius * 4.0, 0.0, 0.0).into(),
                 (0.0, 0.0, 0.0).into(),
                 cgmath::Vector3::unit_y(),
             ),
@@ -128,14 +133,13 @@ impl State {
         );
         let camera = Camera::new(&device, perspective);
 
-        let distance_between_sun_and_earth = 11728.0 * earth_radius * 2.0;
         let earth_axis = cgmath::Vector3::new(0.0, 0.398, 0.917).normalize();
 
         let sun_property = SunProperty::new(
             (
                 0.0,
-                distance_between_sun_and_earth * earth_axis.y,
-                distance_between_sun_and_earth * earth_axis.z,
+                earth_property.get_distance_between_earth_and_sun() * earth_axis.y,
+                earth_property.get_distance_between_earth_and_sun() * earth_axis.z,
             )
                 .into(),
             (1.0, 1.0, 1.0).into(),
@@ -234,35 +238,35 @@ impl State {
             (star, render_pipeline)
         };
 
-        let (earth_model, earth_render_pipeline) = {
-            let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
-                fetcher.fetch_as_bytes("resources/earth/earth.obj"),
-                fetcher.fetch_as_bytes("resources/earth/earth.mtl"),
-                fetcher.fetch_as_bytes("resources/earth/earth_diff.png"),
-            );
+        let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
+            fetcher.fetch_as_bytes("resources/earth/earth.obj"),
+            fetcher.fetch_as_bytes("resources/earth/earth.mtl"),
+            fetcher.fetch_as_bytes("resources/earth/earth_diff.png"),
+        );
 
-            let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
-                earth_obj?.bytes(),
-                earth_mtl?.bytes(),
-                earth_texture_diffuse?.bytes(),
-            );
+        let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
+            earth_obj?.bytes(),
+            earth_mtl?.bytes(),
+            earth_texture_diffuse?.bytes(),
+        );
 
-            let (earth_obj, earth_mtl, earth_texture_diffuse) = (
-                &earth_obj? as &[u8],
-                &earth_mtl? as &[u8],
-                &earth_texture_diffuse? as &[u8],
-            );
+        let (earth_obj, earth_mtl, earth_texture_diffuse) = (
+            &earth_obj? as &[u8],
+            &earth_mtl? as &[u8],
+            &earth_texture_diffuse? as &[u8],
+        );
 
-            let model = EarthModel::create(
-                &device,
-                &queue,
-                earth_obj,
-                earth_mtl,
-                earth_texture_diffuse,
-                &texture_bind_group_layout,
-            )
-            .await?;
+        let (earth_model, atmosphere_model) = create_earth_and_atmosphere_model(
+            &device,
+            &queue,
+            earth_obj,
+            earth_mtl,
+            earth_texture_diffuse,
+            &texture_bind_group_layout,
+        )
+        .await?;
 
+        let earth_render_pipeline = {
             let shader = device.create_shader_module(wgpu::include_wgsl!("shader/earth.wgsl"));
 
             let render_pipeline_layout =
@@ -276,7 +280,7 @@ impl State {
                     push_constant_ranges: &[],
                 });
 
-            let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("earth_render_pipeline"),
                 layout: Some(&render_pipeline_layout),
                 vertex: wgpu::VertexState {
@@ -312,9 +316,60 @@ impl State {
                 },
                 multiview: None,
                 cache: None,
-            });
+            })
+        };
 
-            (model, render_pipeline)
+        let atmosphere_render_pipeline = {
+            let shader = device.create_shader_module(wgpu::include_wgsl!("shader/atmosphere.wgsl"));
+
+            let render_pipeline_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("atmosphere_render_pipeline_layout"),
+                    bind_group_layouts: &[
+                        &camera.bind_group_layout,
+                        &sun.uniform_bind_group_layout,
+                        &earth_property_binding.uniform_bind_group_layout,
+                    ],
+                    push_constant_ranges: &[],
+                });
+
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("atmosphere_render_pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: "vs_main",
+                    buffers: &[ModelVertex::desc()],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(blend_state),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+                cache: None,
+            })
         };
 
         let sun_render_pipeline = {
@@ -375,6 +430,9 @@ impl State {
             sun,
             earth_render_pipeline,
             earth_model,
+            earth_property_binding,
+            atmosphere_render_pipeline,
+            atmosphere_model,
             star_render_pipeline,
             star,
             sun_render_pipeline,
@@ -471,10 +529,18 @@ impl State {
             render_pass.draw(0..3, 0..1);
 
             render_pass.set_pipeline(&self.earth_render_pipeline);
-            render_pass.draw_model(
+            render_pass.draw_earth_model(
                 &self.earth_model,
                 &self.camera.bind_group,
                 &self.sun.uniform_bind_group,
+            );
+
+            render_pass.set_pipeline(&self.atmosphere_render_pipeline);
+            render_pass.draw_atmosphere_model(
+                &self.atmosphere_model,
+                &self.camera.bind_group,
+                &self.sun.uniform_bind_group,
+                &self.earth_property_binding.uniform_bind_group,
             );
         }
 

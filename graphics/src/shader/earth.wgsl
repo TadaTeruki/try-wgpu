@@ -21,7 +21,7 @@ struct SunUniform {
 }
 
 @group(2) @binding(0)
-var<uniform> light: SunUniform;
+var<uniform> sun: SunUniform;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -53,18 +53,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let object_color: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
     
     let ambient_strength = 0.0;
-    let ambient_color = light.color * ambient_strength;
+    let ambient_color = sun.color * ambient_strength;
 
-    let light_dir = normalize(light.position.xyz - in.model_position);
+    let sun_dir = normalize(sun.position.xyz - in.model_position);
 
-    let diffuse_strength = min(max(dot(light_dir, in.normal), 0.0), 1.0);
-    let diffuse_color = light.color * diffuse_strength;
+    let diffuse_strength = min(max(dot(sun_dir, in.normal), 0.0), 1.0);
+    let diffuse_color = sun.color * diffuse_strength;
 
     let view_dir = normalize(camera.view_pos.xyz - in.model_position);
-    let reflect_dir = reflect(-light_dir, in.normal);
+    let reflect_dir = reflect(-sun_dir, in.normal);
 
     let specular_strength = pow(max(dot(reflect_dir, view_dir), 0.0), 18.0);
-    let specular_color = light.color * specular_strength;
+    let specular_color = sun.color * specular_strength;
    
     let result = (ambient_strength + diffuse_color + specular_color) * object_color.xyz;
 
