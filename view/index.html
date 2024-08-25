@@ -52,15 +52,33 @@
 
       #credit {
         color: #aaa;
-        width: 40%;
         text-align: left;
+        width: 40%;
       }
 
       #source {
         color: #aaa;
-        width: 40%;
         text-align: right;
+        width: 40%;
       }
+
+      @media (max-width: 700px) {
+        .head {
+          display: block;
+          text-align: center;
+        }
+
+        #credit {
+          display: none;
+        }
+
+        #source {
+          width: 100%;
+          text-align: center;
+          font-size: 0.75em;
+        }
+      }
+
 
       a {
         color: inherit;
@@ -117,7 +135,7 @@
     <div id="headbox">
       <div class="head" id="head-a">
         <div id="credit">
-          3D Earth model by <a href="https://science.nasa.gov/" target="_blank">NASA Science</a>
+          3D Earth model by <a href="https://www.nasa.gov/" target="_blank">NASA</a>
         </div>
         <div id="title">
           WebGPU Simple Earth Visualizer

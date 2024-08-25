@@ -415,14 +415,11 @@ impl State {
 
     #[wasm_bindgen]
     pub fn render(&mut self) {
-
         let output = self.surface.get_current_texture().unwrap();
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor {
-                format: Some(self.config.format.add_srgb_suffix()),
-                ..Default::default()
-            });
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.config.format.add_srgb_suffix()),
+            ..Default::default()
+        });
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {

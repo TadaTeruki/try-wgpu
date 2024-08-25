@@ -21,7 +21,7 @@ async function main() {
 	const gpuNotSupported = !navigator.gpu;
 	if (gpuNotSupported) {
 		console.error("WebGPU not supported");
-		let loading = document.getElementById("loading");
+		const loading = document.getElementById("loading");
 		if (loading) {
 			loading.innerHTML = `Sorry, your browser does not support WebGPU.<br>
 			See <a href='https://caniuse.com/webgpu' target="_blank">caniuse.com</a>
@@ -71,11 +71,16 @@ async function main() {
 	allowLeft?.addEventListener("mousedown", () => {
 		isAllowLeft = true;
 	});
-
 	allowLeft?.addEventListener("mouseup", () => {
 		isAllowLeft = false;
 	});
 	allowLeft?.addEventListener("mouseleave", () => {
+		isAllowLeft = false;
+	});
+	allowLeft?.addEventListener("touchstart", () => {
+		isAllowLeft = true;
+	});
+	allowLeft?.addEventListener("touchend", () => {
 		isAllowLeft = false;
 	});
 
@@ -87,6 +92,12 @@ async function main() {
 		isAllowRight = false;
 	});
 	allowRight?.addEventListener("mouseleave", () => {
+		isAllowRight = false;
+	});
+	allowRight?.addEventListener("touchstart", () => {
+		isAllowRight = true;
+	});
+	allowRight?.addEventListener("touchend", () => {
 		isAllowRight = false;
 	});
 
