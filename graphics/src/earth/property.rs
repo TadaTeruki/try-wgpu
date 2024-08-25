@@ -1,57 +1,10 @@
-use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingType, BufferUsages, ShaderStages,
-};
+use cgmath::InnerSpace;
 
-pub struct EarthPropertyBinding {
-    pub uniform_bind_group_layout: wgpu::BindGroupLayout,
-    pub uniform_bind_group: wgpu::BindGroup,
-}
-
-impl EarthPropertyBinding {
-    pub fn new(device: &wgpu::Device, property: EarthProperty) -> Self {
-        let uniform_bind_group_layout =
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("earth_property_bind_group_layout"),
-                entries: &[BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX_FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            });
-
-        let uniform_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("earth_property"),
-            contents: bytemuck::cast_slice(&[property]),
-            usage: BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let uniform_bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("earth_property_bind_group"),
-            layout: &uniform_bind_group_layout,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
-        });
-
-        Self {
-            uniform_bind_group,
-            uniform_bind_group_layout,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Debug, Clone)]
 pub struct EarthProperty {
     pub radius: f32,
+    pub rotation: f32,
+    pub axis: cgmath::Vector3<f32>,
     pub atmosphere_radius: f32,
 }
 
@@ -60,6 +13,8 @@ impl Default for EarthProperty {
         let radius = 500.0;
         EarthProperty {
             radius,
+            rotation: 0.0,
+            axis: cgmath::Vector3::new(0.0, 0.9, 0.15).normalize(),
             atmosphere_radius: radius * 1.025,
         }
     }
@@ -69,4 +24,30 @@ impl EarthProperty {
     pub fn get_distance_between_earth_and_sun(&self) -> f32 {
         11728.0 * self.radius * 2.0
     }
+
+    pub fn rotate(&mut self, d: f32) {
+        self.rotation += d;
+    }
+
+    pub fn build_uniform(&self) -> EarthUniform {
+        EarthUniform {
+            radius: self.radius,
+            atmosphere_radius: self.atmosphere_radius,
+            axis: self.axis.into(),
+            rotation: self.rotation,
+            _padding0: 0.0,
+            _padding1: 0.0,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct EarthUniform {
+    pub radius: f32,
+    pub atmosphere_radius: f32,
+    pub rotation: f32,
+    pub _padding0: f32,
+    pub axis: [f32; 3],
+    pub _padding1: f32,
 }

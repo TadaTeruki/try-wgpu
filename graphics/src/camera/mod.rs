@@ -59,4 +59,12 @@ impl Camera {
             bind_group_layout,
         }
     }
+
+    pub fn enque_update(&self, queue: &wgpu::Queue) {
+        queue.write_buffer(
+            &self.buffer,
+            0,
+            bytemuck::cast_slice(&[self.perspective.build_uniform()]),
+        );
+    }
 }

@@ -1,16 +1,13 @@
-use cgmath::InnerSpace;
 use wasm_bindgen::prelude::*;
-use wgpu::{
-    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, RenderPipelineDescriptor,
-    SamplerBindingType, ShaderStages, SurfaceTarget,
-};
+use wgpu::{RenderPipelineDescriptor, SurfaceTarget};
 
 use crate::{
     camera::{geometry::CameraGeometry, perspective::CameraPerspective, Camera},
     earth::{
-        model::{create_earth_and_atmosphere_model, AtmosphereModel, DrawModel, EarthModel},
-        property::{EarthProperty, EarthPropertyBinding},
+        model::{create_earth_and_atmosphere_model, AtmosphereModel, DrawModel},
+        property::EarthProperty,
         vertex::ModelVertex,
+        Earth,
     },
     fetch::Fetcher,
     key::{KeyState, KeyStateMap},
@@ -29,14 +26,17 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     key_states: KeyStateMap,
     camera: Camera,
-    sun: Sun,
+
+    earth: Earth,
     earth_render_pipeline: wgpu::RenderPipeline,
-    earth_model: EarthModel,
-    earth_property_binding: EarthPropertyBinding,
-    atmosphere_render_pipeline: wgpu::RenderPipeline,
+
     atmosphere_model: AtmosphereModel,
-    star_render_pipeline: wgpu::RenderPipeline,
+    atmosphere_render_pipeline: wgpu::RenderPipeline,
+
     star: Star,
+    star_render_pipeline: wgpu::RenderPipeline,
+
+    sun: Sun,
     sun_render_pipeline: wgpu::RenderPipeline,
 }
 
@@ -116,12 +116,23 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
+        let href = web_sys::window().unwrap().location().href().unwrap();
+        let fetcher = Fetcher::new(&href);
+
+        let (earth_model, atmosphere_model) =
+            create_earth_and_atmosphere_model(&device, &queue, &fetcher).await?;
+
         let earth_property = EarthProperty::default();
-        let earth_property_binding = EarthPropertyBinding::new(&device, earth_property);
+        let earth = Earth::new(&device, earth_model, earth_property.clone());
 
         let perspective = CameraPerspective::new(
             CameraGeometry::new(
-                (earth_property.radius * 4.0, 0.0, 0.0).into(),
+                (
+                    earth_property.radius * 4.0,
+                    earth_property.radius,
+                    -earth_property.radius * 1.0,
+                )
+                    .into(),
                 (0.0, 0.0, 0.0).into(),
                 cgmath::Vector3::unit_y(),
             ),
@@ -133,45 +144,17 @@ impl State {
         );
         let camera = Camera::new(&device, perspective);
 
-        let earth_axis = cgmath::Vector3::new(0.0, 0.398, 0.917).normalize();
-
         let sun_property = SunProperty::new(
             (
                 0.0,
-                earth_property.get_distance_between_earth_and_sun() * earth_axis.y,
-                earth_property.get_distance_between_earth_and_sun() * earth_axis.z,
+                0.0,
+                earth_property.get_distance_between_earth_and_sun(),
             )
                 .into(),
             (1.0, 1.0, 1.0).into(),
         );
 
         let sun = Sun::new(&device, sun_property);
-
-        let texture_bind_group_layout =
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("texture_bind_group_layout"),
-                entries: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                ],
-            });
-
-        let href = web_sys::window().unwrap().location().href().unwrap();
-        let fetcher = Fetcher::new(&href);
 
         let blend_state = wgpu::BlendState {
             color: wgpu::BlendComponent {
@@ -238,34 +221,6 @@ impl State {
             (star, render_pipeline)
         };
 
-        let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
-            fetcher.fetch_as_bytes("resources/earth/earth.obj"),
-            fetcher.fetch_as_bytes("resources/earth/earth.mtl"),
-            fetcher.fetch_as_bytes("resources/earth/earth_diff.png"),
-        );
-
-        let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
-            earth_obj?.bytes(),
-            earth_mtl?.bytes(),
-            earth_texture_diffuse?.bytes(),
-        );
-
-        let (earth_obj, earth_mtl, earth_texture_diffuse) = (
-            &earth_obj? as &[u8],
-            &earth_mtl? as &[u8],
-            &earth_texture_diffuse? as &[u8],
-        );
-
-        let (earth_model, atmosphere_model) = create_earth_and_atmosphere_model(
-            &device,
-            &queue,
-            earth_obj,
-            earth_mtl,
-            earth_texture_diffuse,
-            &texture_bind_group_layout,
-        )
-        .await?;
-
         let earth_render_pipeline = {
             let shader = device.create_shader_module(wgpu::include_wgsl!("shader/earth.wgsl"));
 
@@ -274,8 +229,9 @@ impl State {
                     label: Some("earth_render_pipeline_layout"),
                     bind_group_layouts: &[
                         &camera.bind_group_layout,
-                        &texture_bind_group_layout,
+                        &earth.model.texture_bind_group_layout,
                         &sun.uniform_bind_group_layout,
+                        &earth.uniform_bind_group_layout,
                     ],
                     push_constant_ranges: &[],
                 });
@@ -328,7 +284,7 @@ impl State {
                     bind_group_layouts: &[
                         &camera.bind_group_layout,
                         &sun.uniform_bind_group_layout,
-                        &earth_property_binding.uniform_bind_group_layout,
+                        &earth.uniform_bind_group_layout,
                     ],
                     push_constant_ranges: &[],
                 });
@@ -429,8 +385,7 @@ impl State {
             camera,
             sun,
             earth_render_pipeline,
-            earth_model,
-            earth_property_binding,
+            earth,
             atmosphere_render_pipeline,
             atmosphere_model,
             star_render_pipeline,
@@ -462,11 +417,9 @@ impl State {
     pub async fn update(&mut self, _time: f32) {
         self.camera.perspective.process_events(&self.key_states);
         self.camera.perspective.tween(0.15);
-        self.queue.write_buffer(
-            &self.camera.buffer,
-            0,
-            bytemuck::cast_slice(&[self.camera.perspective.build_uniform()]),
-        );
+        self.camera.enque_update(&self.queue);
+        self.earth.property.rotate(0.001);
+        self.earth.enque_update_uniform(&self.queue);
         self.key_states.update();
     }
 
@@ -530,9 +483,10 @@ impl State {
 
             render_pass.set_pipeline(&self.earth_render_pipeline);
             render_pass.draw_earth_model(
-                &self.earth_model,
+                &self.earth.model,
                 &self.camera.bind_group,
                 &self.sun.uniform_bind_group,
+                &self.earth.uniform_bind_group,
             );
 
             render_pass.set_pipeline(&self.atmosphere_render_pipeline);
@@ -540,7 +494,7 @@ impl State {
                 &self.atmosphere_model,
                 &self.camera.bind_group,
                 &self.sun.uniform_bind_group,
-                &self.earth_property_binding.uniform_bind_group,
+                &self.earth.uniform_bind_group,
             );
         }
 

@@ -21,6 +21,10 @@ var<uniform> sun: SunUniform;
 struct EarthUniform {
     radius: f32,
     atmosphere_radius: f32,
+    rotation: f32,
+    _padding0: f32,
+    axis: vec3<f32>,
+    _padding1: f32,
 }
 
 @group(2) @binding(0)
@@ -94,6 +98,10 @@ fn optical_depth(ray_start: vec3<f32>, ray_end: vec3<f32>, center: vec3<f32>) ->
     return optical_depth_sum/f32(division);
 }
 
+
+// Warning: This calculation is actually not correct.
+// See https://developer.nvidia.com/gpugems/gpugems2/part-ii-shading-lighting-and-shadows/chapter-16-accurate-atmospheric-scattering
+// to check the expected calculation to be done.
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ray_origin = camera.view_pos.xyz;
@@ -109,7 +117,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     
     var strength_average: f32 = 0.0;
     if (!vector3_equals(atmosphere_start, center) && !vector3_equals(atmosphere_end, center)) {
-        let division: i32 = 20;
+        let division: i32 = 5;
         var strength_sum: f32 = 0.0;
         let sample_interval = (atmosphere_end - atmosphere_start) / f32(division-1);
         for (var i: i32 = 0; i < division; i++) {
@@ -118,8 +126,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             let sample_sun_dir = normalize(sample_position-sun.position.xyz);
             
             let intersection_sun_atmosphere = intersection_sphere(sun.position.xyz, sample_sun_dir, center, earth.atmosphere_radius);
-            
-            // this is not correct
+
             let sun_dir = normalize(sun.position.xyz - sample_position);
             var diffuse_strength = min(max(-dot(-sun_dir, in.normal), 0.0), 1.0);
             

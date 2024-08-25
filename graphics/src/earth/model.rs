@@ -2,12 +2,18 @@
 
 use std::io::BufReader;
 
+use crate::fetch::Fetcher;
+
 use super::{texture, vertex::ModelVertex};
-use wgpu::{util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindingResource};
+use wgpu::{
+    util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingResource, BindingType, SamplerBindingType, ShaderStages,
+};
 
 pub struct EarthModel {
     pub mesh: EarthMesh,
     pub texture_bind_group: wgpu::BindGroup,
+    pub texture_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 pub struct AtmosphereModel {
@@ -20,17 +26,54 @@ pub struct EarthMesh {
     pub num_elements: u32,
 }
 
-pub async fn create_earth_and_atmosphere_model(
+pub async fn create_earth_and_atmosphere_model<'a>(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    obj_src: &[u8],
-    mtl_src: &[u8],
-    texture_diffuse_src: &[u8],
-    texture_bind_group_layout: &wgpu::BindGroupLayout,
+    fetcher: &Fetcher<'a>,
 ) -> anyhow::Result<(EarthModel, AtmosphereModel)> {
-    let mut bufreader = BufReader::new(obj_src);
+    let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
+        fetcher.fetch_as_bytes("resources/earth/earth.obj"),
+        fetcher.fetch_as_bytes("resources/earth/earth.mtl"),
+        fetcher.fetch_as_bytes("resources/earth/earth_diff.png"),
+    );
 
-    let raw_mtl = tobj::load_mtl_buf(&mut BufReader::new(mtl_src))?;
+    let (earth_obj, earth_mtl, earth_texture_diffuse) = futures::join!(
+        earth_obj?.bytes(),
+        earth_mtl?.bytes(),
+        earth_texture_diffuse?.bytes(),
+    );
+
+    let (earth_obj, earth_mtl, earth_texture_diffuse) = (
+        &earth_obj? as &[u8],
+        &earth_mtl? as &[u8],
+        &earth_texture_diffuse? as &[u8],
+    );
+
+    let mut bufreader = BufReader::new(earth_obj);
+
+    let texture_bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("texture_bind_group_layout"),
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+    });
+
+    let raw_mtl = tobj::load_mtl_buf(&mut BufReader::new(earth_mtl))?;
 
     let (raw_models, _) = tobj::load_obj_buf(
         &mut bufreader,
@@ -93,11 +136,11 @@ pub async fn create_earth_and_atmosphere_model(
         (meshes_iter.next().unwrap(), meshes_iter.next().unwrap())
     };
 
-    let texture = texture::TextureSet::from_bytes(device, queue, texture_diffuse_src, "texture")?;
+    let texture = texture::TextureSet::from_bytes(device, queue, earth_texture_diffuse, "texture")?;
 
     let texture_bind_group = device.create_bind_group(&BindGroupDescriptor {
         label: Some("material_bind_group"),
-        layout: texture_bind_group_layout,
+        layout: &texture_bind_group_layout,
         entries: &[
             BindGroupEntry {
                 binding: 0,
@@ -114,6 +157,7 @@ pub async fn create_earth_and_atmosphere_model(
         EarthModel {
             mesh: earth_mesh,
             texture_bind_group,
+            texture_bind_group_layout,
         },
         AtmosphereModel {
             mesh: atmosphere_mesh,
@@ -127,6 +171,7 @@ pub trait DrawModel<'a> {
         model: &'a EarthModel,
         camera_bind_group: &'a wgpu::BindGroup,
         sun_bind_group: &'a wgpu::BindGroup,
+        earth_property_bind_group: &'a wgpu::BindGroup,
     );
 
     fn draw_atmosphere_model(
@@ -144,12 +189,14 @@ impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
         model: &'a EarthModel,
         camera_bind_group: &'a wgpu::BindGroup,
         sun_bind_group: &'a wgpu::BindGroup,
+        earth_property_bind_group: &'a wgpu::BindGroup,
     ) {
         self.set_vertex_buffer(0, model.mesh.vertex_buffer.slice(..));
         self.set_index_buffer(model.mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         self.set_bind_group(0, camera_bind_group, &[]);
         self.set_bind_group(1, &model.texture_bind_group, &[]);
         self.set_bind_group(2, &sun_bind_group, &[]);
+        self.set_bind_group(3, earth_property_bind_group, &[]);
         self.draw_indexed(0..model.mesh.num_elements, 0, 0..1);
     }
 

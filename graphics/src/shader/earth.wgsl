@@ -23,6 +23,18 @@ struct SunUniform {
 @group(2) @binding(0)
 var<uniform> sun: SunUniform;
 
+struct EarthUniform {
+    radius: f32,
+    atmosphere_radius: f32,
+    rotation: f32,
+    _padding0: f32,
+    axis: vec3<f32>,
+    _padding1: f32,
+}
+
+@group(3) @binding(0)
+var<uniform> earth: EarthUniform;
+
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) tex_coords: vec2<f32>,
@@ -36,15 +48,30 @@ struct VertexOutput {
     @location(2) model_position: vec3<f32>,
 };
 
+fn rotation_matrix(angle: f32, axis: vec3<f32>) -> mat3x3<f32> {
+    let c = cos(angle);
+    let s = sin(angle);
+    let oc = 1.0 - c;
+    let x = axis.x;
+    let y = axis.y;
+    let z = axis.z;
+    return mat3x3<f32>(
+        vec3<f32>(oc*x*x+c, oc*x*y-s*z, oc*x*z+s*y),
+        vec3<f32>(oc*x*y+s*z, oc*y*y+c, oc*y*z-s*x),
+        vec3<f32>(oc*x*z-s*y, oc*y*z+s*x, oc*z*z+c),
+    );
+}
+
 @vertex
 fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
+    let rotation_matrix = rotation_matrix(earth.rotation, earth.axis);
+    out.model_position = model.position*rotation_matrix;
+    out.clip_position = camera.view_proj * vec4<f32>(out.model_position, 1.0) ;
     out.tex_coords = model.tex_coords;
-    out.normal = model.normal;
-    out.model_position = model.position;
+    out.normal = model.normal*rotation_matrix;
     return out;
 }
 
