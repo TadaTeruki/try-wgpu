@@ -94,8 +94,7 @@ impl State {
                     .first()
                     .copied()
                     .expect("No surface formats"),
-            )
-            .add_srgb_suffix();
+            );
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -112,7 +111,11 @@ impl State {
                 .first()
                 .copied()
                 .expect("No alpha modes"),
-            view_formats: vec![],
+            view_formats: if !surface_format.is_srgb() {
+                vec![surface_format.add_srgb_suffix()]
+            } else {
+                vec![]
+            },
             desired_maximum_frame_latency: 2,
         };
 
@@ -209,7 +212,7 @@ impl State {
                     module: &shader,
                     entry_point: "fs_main",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: config.format,
+                        format: config.format.add_srgb_suffix(),
                         blend: Some(blend_state),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -253,7 +256,7 @@ impl State {
                     module: &shader,
                     entry_point: "fs_main",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: config.format,
+                        format: config.format.add_srgb_suffix(),
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -294,7 +297,7 @@ impl State {
                     module: &shader,
                     entry_point: "fs_main",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: config.format,
+                        format: config.format.add_srgb_suffix(),
                         blend: Some(blend_state),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -330,7 +333,7 @@ impl State {
                     module: &shader,
                     entry_point: "fs_main",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: config.format,
+                        format: config.format.add_srgb_suffix(),
                         blend: Some(blend_state),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -412,10 +415,14 @@ impl State {
 
     #[wasm_bindgen]
     pub fn render(&mut self) {
+
         let output = self.surface.get_current_texture().unwrap();
         let view = output
             .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+            .create_view(&wgpu::TextureViewDescriptor {
+                format: Some(self.config.format.add_srgb_suffix()),
+                ..Default::default()
+            });
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
