@@ -7,24 +7,14 @@ use wgpu::{util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindingResource
 
 pub struct EarthModel {
     pub mesh: EarthMesh,
-    pub material: EarthMaterial,
+    pub texture_bind_group: wgpu::BindGroup,
 }
 
 pub struct AtmosphereModel {
     pub mesh: EarthMesh,
 }
 
-pub struct EarthMaterial {
-    #[allow(dead_code)]
-    name: String,
-    #[allow(dead_code)]
-    diffuse_texture: texture::TextureSet,
-    pub bind_group: wgpu::BindGroup,
-}
-
 pub struct EarthMesh {
-    #[allow(dead_code)]
-    name: String,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_elements: u32,
@@ -95,7 +85,6 @@ pub async fn create_earth_and_atmosphere_model(
             });
 
             EarthMesh {
-                name: label.to_string(),
                 vertex_buffer,
                 index_buffer,
                 num_elements: raw_mesh.indices.len() as u32,
@@ -121,16 +110,10 @@ pub async fn create_earth_and_atmosphere_model(
         ],
     });
 
-    let material = EarthMaterial {
-        name: "material".to_string(),
-        diffuse_texture: texture,
-        bind_group: texture_bind_group,
-    };
-
     Ok((
         EarthModel {
             mesh: earth_mesh,
-            material,
+            texture_bind_group,
         },
         AtmosphereModel {
             mesh: atmosphere_mesh,
@@ -165,7 +148,7 @@ impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
         self.set_vertex_buffer(0, model.mesh.vertex_buffer.slice(..));
         self.set_index_buffer(model.mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         self.set_bind_group(0, camera_bind_group, &[]);
-        self.set_bind_group(1, &model.material.bind_group, &[]);
+        self.set_bind_group(1, &model.texture_bind_group, &[]);
         self.set_bind_group(2, &sun_bind_group, &[]);
         self.draw_indexed(0..model.mesh.num_elements, 0, 0..1);
     }
