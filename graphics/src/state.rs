@@ -381,6 +381,16 @@ impl State {
         self.key_states.purge();
     }
 
+
+    #[wasm_bindgen]
+    pub fn scroll_to_right(&mut self) {
+        self.camera.perspective.scroll_to_right();
+    }
+
+    pub fn scroll_to_left(&mut self) {
+        self.camera.perspective.scroll_to_left();
+    }
+
     #[wasm_bindgen]
     pub async fn update(&mut self, _time: f32) {
         self.camera.perspective.process_events(&self.key_states);

@@ -7,17 +7,134 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/peruicon/favicon-16x16.png">
     <link rel="manifest" href="/peruicon/site.webmanifest">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Try wgpu!</title>
+    <title>WebGPU Simple Earth Visualizer</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Poppins&display=swap');
+
       body {
         margin: 0;
         padding: 0;
         overflow: hidden;
+        font-family: "Poppins", sans-serif;
+        background-color: #aaa;
+      }
+
+      #headbox {
+        position: absolute;
+        top: 0;
+        width: 100vw;
+        z-index: 1;
+      }
+
+      .head {
+        display: flex;
+        justify-content: space-between;
+        color: white;
+        white-space: nowrap;
+        padding: 0.2em 2.0em;
+      }
+
+      #head-a {
+        background-color: #333;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        font-size: 0.9em;
+      }
+
+      #head-b {
+        font-size: 0.7em;
+      }
+
+      #control {
+        width: fit-content;
+        margin: auto;
+        color: #ddd;
+      }
+
+      #credit {
+        color: #aaa;
+        width: 40%;
+        text-align: left;
+      }
+
+      #source {
+        color: #aaa;
+        width: 40%;
+        text-align: right;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: underline #fff7;
+      }
+
+      .allow-box {
+        position: absolute;
+        color: white;
+        z-index: 1;
+        width: 2.5em;
+        height: 2.5em;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        border-radius: 50%;
+        border: 1px solid #bbb;
+        background-color: transparent;
+        transition: background-color 0.3s;
+      }
+
+      .allow-box:hover {
+        background-color: #555;
+      }
+
+      #allow-right {
+        top: 50%;
+        right: 1em;
+      }
+
+      #allow-left {
+        top: 50%;
+        left: 1em;
+      }
+
+      .allow-text {
+        margin: auto;
+      }
+
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 1em;
+        z-index: 1;
       }
     </style>
   </head>
   <body>
     <canvas id="main-canvas"></canvas>
+    <div id="headbox">
+      <div class="head" id="head-a">
+        <div id="credit">
+          3D Earth model by <a href="https://science.nasa.gov/" target="_blank">NASA Science</a>
+        </div>
+        <div id="title">
+          WebGPU Simple Earth Visualizer
+        </div>
+        <div id="source">
+          <a href="https://github.com/TadaTeruki/webgpu-simple-earth" target="_blank">View Source</a>
+        </div>
+      </div>
+      <div class="head" id="head-b">
+        <div id="control">
+          [w,a,s,d] to move, [q,e] to zoom, [i,j,k,l] to rotate
+        </div>
+      </div>
+    </div>
+    <button class="allow-box" id="allow-right"> <div class="allow-text"> &gt; </div> </button>
+    <button class="allow-box" id="allow-left"> <div class="allow-text"> &lt; </div> </button>
+    <div id="loading"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

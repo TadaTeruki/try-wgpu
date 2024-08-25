@@ -18,13 +18,21 @@ async function main() {
 	await init();
 
 	// if the navigator does not have field 'gpu' then use WebGL
-	const useGlInstead = !navigator as any["gpu"];
-	if (useGlInstead) {
-		console.error("WebGPU not supported, falling back to WebGL");
+	const gpuNotSupported = !navigator.gpu;
+	if (gpuNotSupported) {
+		console.error("WebGPU not supported");
+		let loading = document.getElementById("loading");
+		if (loading) {
+			loading.innerHTML = `Sorry, your browser does not support WebGPU.<br>
+			See <a href='https://caniuse.com/webgpu' target="_blank">caniuse.com</a>
+			to check the current status of WebGPU support.
+			`;
+		}
+		return;
 	}
 
 	// create state
-	const state = await create_state(canvas, useGlInstead);
+	const state = await create_state(canvas, false);
 	if (!state) {
 		return;
 	}
@@ -56,6 +64,32 @@ async function main() {
 		state.leave();
 	});
 
+	const allowLeft = document.getElementById("allow-left");
+	const allowRight = document.getElementById("allow-right");
+
+	let isAllowLeft = false;
+	allowLeft?.addEventListener("mousedown", () => {
+		isAllowLeft = true;
+	});
+
+	allowLeft?.addEventListener("mouseup", () => {
+		isAllowLeft = false;
+	});
+	allowLeft?.addEventListener("mouseleave", () => {
+		isAllowLeft = false;
+	});
+
+	let isAllowRight = false;
+	allowRight?.addEventListener("mousedown", () => {
+		isAllowRight = true;
+	});
+	allowRight?.addEventListener("mouseup", () => {
+		isAllowRight = false;
+	});
+	allowRight?.addEventListener("mouseleave", () => {
+		isAllowRight = false;
+	});
+
 	// `update` is called 60 times per second
 	const updateInterval = 1000 / 60;
 	const initialTime = Date.now();
@@ -63,6 +97,12 @@ async function main() {
 	const updateloop = () => {
 		const currentTime = Date.now();
 		state.update((currentTime - initialTime) / updateInterval);
+		if (isAllowLeft) {
+			state.scroll_to_left();
+		}
+		if (isAllowRight) {
+			state.scroll_to_right();
+		}
 		const nextTime = Date.now();
 
 		const passedTime = nextTime - currentTime;

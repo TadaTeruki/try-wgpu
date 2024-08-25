@@ -88,6 +88,16 @@ impl CameraPerspective {
             });
     }
 
+    pub fn scroll_to_left(&mut self) {
+        self.geom_goal.move_left(self.speed);
+        self.geom_goal.rotate_right(self.speed);
+    }
+
+    pub fn scroll_to_right(&mut self) {
+        self.geom_goal.move_right(self.speed);
+        self.geom_goal.rotate_left(self.speed);
+    }
+
     pub fn tween(&mut self, prop: f32) {
         self.geom_current.tween(&self.geom_goal, prop);
     }
