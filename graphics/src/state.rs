@@ -380,7 +380,6 @@ impl State {
         self.key_states.purge();
     }
 
-
     #[wasm_bindgen]
     pub fn scroll_to_right(&mut self) {
         self.camera.perspective.scroll_to_right();
