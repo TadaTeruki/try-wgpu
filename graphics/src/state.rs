@@ -94,8 +94,7 @@ impl State {
                     .first()
                     .copied()
                     .expect("No surface formats"),
-            )
-            .add_srgb_suffix();
+            );
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
